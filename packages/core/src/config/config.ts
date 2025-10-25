@@ -475,6 +475,7 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
+    // debugLogger.log(`[DEBUG] useModelRouter: ${this.useModelRouter}`);
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
     this.codebaseInvestigatorSettings = {
@@ -486,6 +487,9 @@ export class Config {
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
     };
+    // debugLogger.log(
+    //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,
+    // );
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;

@@ -181,6 +181,9 @@ export class ClassifierStrategy implements RoutingStrategy {
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
+      debugLogger.log(
+        `[Routing] ClassifierStrategy selected model: ${routerResponse.model_choice} based on reasoning: ${routerResponse.reasoning}`,
+      );
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;

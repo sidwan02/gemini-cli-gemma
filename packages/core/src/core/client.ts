@@ -53,6 +53,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import * as fs from 'node:fs/promises';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -262,6 +263,20 @@ My setup is complete. I will provide my first command in the next turn.
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      if (systemInstruction) {
+        try {
+          // Ensure fs/promises is imported at the top of the file:
+          // import * as fs from 'fs/promises';
+          await fs.writeFile('prompt.txt', systemInstruction);
+          console.log('[DEBUG] System Instruction saved to prompt.txt');
+        } catch (error) {
+          console.error(
+            '[DEBUG] Failed to save system instruction to prompt.txt:',
+            error,
+          );
+        }
+      }
+
       const model = this.config.getModel();
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
