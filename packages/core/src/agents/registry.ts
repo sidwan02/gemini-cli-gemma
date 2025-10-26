@@ -9,6 +9,7 @@ import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ModelConfig } from '../agents/types.js';
 
 /**
  * Manages the discovery, loading, validation, and registration of
@@ -45,9 +46,6 @@ export class AgentRegistry {
           model:
             investigatorSettings.model ??
             CodebaseInvestigatorAgent.modelConfig.model,
-          thinkingBudget:
-            investigatorSettings.thinkingBudget ??
-            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
         },
         runConfig: {
           ...CodebaseInvestigatorAgent.runConfig,
@@ -59,6 +57,12 @@ export class AgentRegistry {
             CodebaseInvestigatorAgent.runConfig.max_turns,
         },
       };
+
+      if (!('host' in agentDef.modelConfig)) {
+        agentDef.modelConfig.thinkingBudget =
+          investigatorSettings.thinkingBudget ??
+          (CodebaseInvestigatorAgent.modelConfig as ModelConfig).thinkingBudget;
+      }
       this.registerAgent(agentDef);
     }
   }

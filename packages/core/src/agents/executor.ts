@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Type } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
+import { OllamaChat } from '../core/ollamaChat.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { Type } from '@google/genai';
 import type {
-  Content,
-  Part,
+  Content as GeminiContent,
+  Part as GeminiPart,
   FunctionCall,
   GenerateContentConfig,
   FunctionDeclaration,
@@ -35,6 +36,8 @@ import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
+  ModelConfig,
+  OllamaModelConfig,
   OutputObject,
   SubagentActivityEvent,
 } from './types.js';
@@ -44,6 +47,7 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { Part as OllamaPart } from '../core/ollamaChat.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -171,7 +175,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
         : 'Get Started!';
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
+      let currentMessage: GeminiContent = {
+        role: 'user',
+        parts: [{ text: query }],
+      };
 
       while (true) {
         // Check for termination conditions like max turns or timeout.
@@ -256,14 +263,33 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns The model's response, including any tool calls or text.
    */
   private async callModel(
+    chat: GeminiChat | OllamaChat,
+    message: GeminiContent,
+    tools: FunctionDeclaration[],
+    signal: AbortSignal,
+    promptId: string,
+  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    if (chat instanceof GeminiChat) {
+      return this.callGeminiModel(chat, message, tools, signal, promptId);
+    } else if (chat instanceof OllamaChat) {
+      return this.callOllamaModel(chat, message, signal);
+    } else {
+      throw new Error('Unsupported chat object type');
+    }
+  }
+
+  /**
+   * Calls the Gemini model with the given message and tools.
+   */
+  private async callGeminiModel(
     chat: GeminiChat,
-    message: Content,
+    message: GeminiContent,
     tools: FunctionDeclaration[],
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
     const messageParams = {
-      message: message.parts || [],
+      message: (message.parts || []) as GeminiPart[],
       config: {
         abortSignal: signal,
         tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
@@ -288,21 +314,21 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // Extract and emit any subject "thought" content from the model.
         const { subject } = parseThought(
-          parts?.find((p) => p.thought)?.text || '',
+          parts?.find((p) => 'thought' in p && p.thought)?.text || '',
         );
         if (subject) {
           this.emitActivity('THOUGHT_CHUNK', { text: subject });
         }
 
         // Collect any function calls requested by the model.
-        if (chunk.functionCalls) {
+        if ('functionCalls' in chunk && chunk.functionCalls) {
           functionCalls.push(...chunk.functionCalls);
         }
 
         // Handle text response (non-thought text)
         const text =
           parts
-            ?.filter((p) => !p.thought && p.text)
+            ?.filter((p) => !('thought' in p && p.thought) && p.text)
             .map((p) => p.text)
             .join('') || '';
 
@@ -315,8 +341,50 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     return { functionCalls, textResponse };
   }
 
+  /**
+   * Calls the Ollama model with the given message.
+   */
+  private async callOllamaModel(
+    chat: OllamaChat,
+    message: GeminiContent,
+    signal: AbortSignal,
+  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const messageParams = {
+      message: (message.parts || []) as OllamaPart[],
+    };
+
+    const responseStream = await chat.sendMessageStream(
+      this.definition.modelConfig.model,
+      messageParams,
+    );
+
+    let textResponse = '';
+
+    for await (const resp of responseStream) {
+      if (signal.aborted) break;
+
+      if (resp.type === StreamEventType.CHUNK) {
+        const chunk = resp.value;
+        const parts = chunk.candidates?.[0]?.content?.parts;
+
+        const text = parts?.map((p) => p.text).join('') || '';
+
+        if (text) {
+          textResponse += text;
+          // For Ollama, we'll treat all output as a "thought" for now
+          this.emitActivity('THOUGHT_CHUNK', { text });
+        }
+      }
+    }
+
+    // Ollama does not support function calls.
+    return { functionCalls: [], textResponse };
+  }
+
   /** Initializes a `GeminiChat` instance for the agent run. */
-  private async createChatObject(inputs: AgentInputs): Promise<GeminiChat> {
+  private async createChatObject(
+    inputs: AgentInputs,
+  ): Promise<GeminiChat | OllamaChat> {
     const { promptConfig, modelConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
@@ -335,34 +403,38 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       ? await this.buildSystemPrompt(inputs)
       : undefined;
 
-    try {
-      const generationConfig: GenerateContentConfig = {
-        temperature: modelConfig.temp,
-        topP: modelConfig.top_p,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget: modelConfig.thinkingBudget ?? -1,
-        },
-      };
+    if ('host' in modelConfig) {
+      return new OllamaChat(modelConfig as OllamaModelConfig);
+    } else {
+      try {
+        const generationConfig: GenerateContentConfig = {
+          temperature: (modelConfig as ModelConfig).temp,
+          topP: (modelConfig as ModelConfig).top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: (modelConfig as ModelConfig).thinkingBudget ?? -1,
+          },
+        };
 
-      if (systemInstruction) {
-        generationConfig.systemInstruction = systemInstruction;
+        if (systemInstruction) {
+          generationConfig.systemInstruction = systemInstruction;
+        }
+
+        return new GeminiChat(
+          this.runtimeContext,
+          generationConfig,
+          startHistory,
+        );
+      } catch (error) {
+        await reportError(
+          error,
+          `Error initializing Gemini chat for agent ${this.definition.name}.`,
+          startHistory,
+          'startChat',
+        );
+        // Re-throw as a more specific error after reporting.
+        throw new Error(`Failed to create chat object: ${error}`);
       }
-
-      return new GeminiChat(
-        this.runtimeContext,
-        generationConfig,
-        startHistory,
-      );
-    } catch (error) {
-      await reportError(
-        error,
-        `Error initializing Gemini chat for agent ${this.definition.name}.`,
-        startHistory,
-        'startChat',
-      );
-      // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
     }
   }
 
@@ -376,7 +448,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{
-    nextMessage: Content;
+    nextMessage: GeminiContent;
     submittedOutput: string | null;
     taskCompleted: boolean;
   }> {
@@ -388,9 +460,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let taskCompleted = false;
 
     // We'll collect promises for the tool executions
-    const toolExecutionPromises: Array<Promise<Part[] | void>> = [];
+    const toolExecutionPromises: Array<Promise<GeminiPart[] | void>> = [];
     // And we'll need a place to store the synchronous results (like complete_task or blocked calls)
-    const syncResponseParts: Part[] = [];
+    const syncResponseParts: GeminiPart[] = [];
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
@@ -566,7 +638,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     const asyncResults = await Promise.all(toolExecutionPromises);
 
     // Combine all response parts
-    const toolResponseParts: Part[] = [...syncResponseParts];
+    const toolResponseParts: GeminiPart[] = [...syncResponseParts];
     for (const result of asyncResults) {
       if (result) {
         toolResponseParts.push(...result);
@@ -685,9 +757,9 @@ Important Rules:
    * @returns A new array of `Content` with templated strings.
    */
   private applyTemplateToInitialMessages(
-    initialMessages: Content[],
+    initialMessages: GeminiContent[],
     inputs: AgentInputs,
-  ): Content[] {
+  ): GeminiContent[] {
     return initialMessages.map((content) => {
       const newParts = (content.parts ?? []).map((part) => {
         if ('text' in part && part.text !== undefined) {

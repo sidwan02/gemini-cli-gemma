@@ -113,6 +113,7 @@
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "latest-version": "^9.0.0",
+    "ollama": "^0.6.0",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {

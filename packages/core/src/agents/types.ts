@@ -57,7 +57,7 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
   displayName?: string;
   description: string;
   promptConfig: PromptConfig;
-  modelConfig: ModelConfig;
+  modelConfig: ModelConfig | OllamaModelConfig;
   runConfig: RunConfig;
   toolConfig?: ToolConfig;
   outputConfig?: OutputConfig<TOutput>;
@@ -155,6 +155,16 @@ export interface ModelConfig {
   temp: number;
   top_p: number;
   thinkingBudget?: number;
+}
+
+/**
+ * Configures the generative model parameters for an agent using Ollama.
+ */
+export interface OllamaModelConfig {
+  model: string;
+  host: string;
+  temp: number;
+  top_p: number;
 }
 
 /**
