@@ -132,10 +132,10 @@ export class OllamaChat {
       });
 
       const modelResponseParts: Part[] = [];
-      let accumulatedText = '';
+      // let accumulatedText = '';
       for await (const chunk of stream) {
         const chunkText = chunk.message.content;
-        accumulatedText += chunkText;
+        // accumulatedText += chunkText;
         modelResponseParts.push({ text: chunkText });
 
         const responseChunk: GenerateContentResponse = {
@@ -143,7 +143,8 @@ export class OllamaChat {
             {
               content: {
                 role: 'model',
-                parts: [{ text: accumulatedText }],
+                // parts: [{ text: accumulatedText }],
+                parts: [{ text: chunkText }],
               },
             },
           ],

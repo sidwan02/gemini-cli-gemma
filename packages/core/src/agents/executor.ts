@@ -48,6 +48,7 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Part as OllamaPart } from '../core/ollamaChat.js';
+import { stripJsonMarkdown } from '../utils/json.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -194,6 +195,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         const promptId = `${this.agentId}#${turnCounter++}`;
 
+        // The textResponse is not deconstructed from callModel, but it's used to emit/yield thoughts and streamed chunks to the UI.
         const { functionCalls } = await promptIdContext.run(
           promptId,
           async () =>
@@ -382,7 +384,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         if (text) {
           textResponse += text;
           // For Ollama, we'll treat all output as a "thought" for now
-          this.emitActivity('THOUGHT_CHUNK', { text });
+          this.emitActivity('THOUGHT_CHUNK', { textResponse });
         }
       }
     }
@@ -395,9 +397,29 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let functionCalls: FunctionCall[] = [];
     if (completeTaskDeclaration) {
       debugLogger.log('[Debug] Ollama complete_task tool detected.');
+      const outputName = this.definition.outputConfig?.outputName;
+      let args = {};
+
+      if (outputName && textResponse) {
+        try {
+          // The model is prompted to return a JSON object string.
+          // We parse it to create a structured argument for the tool call.
+          const strippedText = stripJsonMarkdown(textResponse);
+          debugLogger.log(
+            `[Debug] Stripped JSON text for parsing: ${strippedText}`,
+          );
+          args = { [outputName]: JSON.parse(strippedText) };
+        } catch (error) {
+          debugLogger.log(`[Debug] Failed to parse JSON response: ${error}`);
+          // If parsing fails, pass the raw string. The validator in
+          // `processFunctionCalls` will then fail with a clear error.
+          args = { [outputName]: textResponse };
+        }
+      }
+
       const completeTaskFunctionCall: FunctionCall = {
         name: completeTaskDeclaration.name,
-        args: { response: textResponse },
+        args,
         id: 'ollama-complete-task',
       };
       functionCalls = [completeTaskFunctionCall];
@@ -532,6 +554,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
             const outputValue = args[outputName];
+            // TODO: keep getting Output validation failed: { formErrors: [ 'Expected object, received string' ], fieldErrors: {} }.
             const validationResult = outputConfig.schema.safeParse(outputValue);
 
             if (!validationResult.success) {
