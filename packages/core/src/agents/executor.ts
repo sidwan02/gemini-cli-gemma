@@ -428,7 +428,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     if ('host' in modelConfig) {
-      return new OllamaChat(modelConfig as OllamaModelConfig);
+      return new OllamaChat(
+        modelConfig as OllamaModelConfig,
+        systemInstruction,
+        startHistory,
+      );
     } else {
       try {
         const generationConfig: GenerateContentConfig = {

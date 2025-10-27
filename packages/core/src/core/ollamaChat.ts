@@ -6,13 +6,13 @@
 
 import { Ollama } from 'ollama';
 import type { OllamaModelConfig } from '../agents/types.js';
-// import { debugLogger } from '../utils/debugLogger.js';
+import type { Content as GeminiContent } from '@google/genai';
 
 // #region Self-contained types
 // These types are defined locally to avoid any dependency on @google/genai.
 
 /** The role of the author of a piece of content. */
-export type Role = 'user' | 'model';
+export type Role = 'user' | 'model' | 'system';
 
 /** A part of a multi-part message. */
 export interface Part {
@@ -54,7 +54,7 @@ function toOllamaMessage(content: Content) {
   const text = content.parts.map((part) => part.text).join('');
   return {
     // Ollama uses 'assistant' for the model's role.
-    role: content.role === 'model' ? 'assistant' : 'user',
+    role: content.role === 'model' ? 'assistant' : content.role,
     content: text,
   };
 }
@@ -68,9 +68,28 @@ function toOllamaMessage(content: Content) {
 export class OllamaChat {
   private history: Content[] = [];
   private readonly ollama: Ollama;
+  private readonly systemInstruction?: string;
 
-  constructor(private readonly modelConfig: OllamaModelConfig) {
+  constructor(
+    private readonly modelConfig: OllamaModelConfig,
+    systemInstruction?: string,
+    history?: GeminiContent[],
+  ) {
     this.ollama = new Ollama({ host: modelConfig.host });
+    this.systemInstruction = systemInstruction;
+    if (history) {
+      this.history = history
+        .filter(
+          (geminiContent) =>
+            geminiContent.role === 'user' || geminiContent.role === 'model',
+        )
+        .map((geminiContent) => ({
+          role: geminiContent.role as 'user' | 'model',
+          parts: (geminiContent.parts ?? [])
+            .map((part) => ('text' in part ? { text: part.text } : null))
+            .filter((part): part is Part => part !== null),
+        }));
+    }
   }
 
   /**
@@ -92,6 +111,12 @@ export class OllamaChat {
     this.history.push(userContent);
 
     const messages = this.history.map(toOllamaMessage);
+    if (this.systemInstruction) {
+      messages.unshift({
+        role: 'system',
+        content: this.systemInstruction,
+      });
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
