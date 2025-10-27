@@ -7,6 +7,9 @@
 import { Ollama } from 'ollama';
 import type { OllamaModelConfig } from '../agents/types.js';
 import type { Content as GeminiContent } from '@google/genai';
+import { debugLogger } from '../utils/debugLogger.js';
+// import { debugLogger } from '../utils/debugLogger.js';
+import * as fs from 'node:fs/promises';
 
 // #region Self-contained types
 // These types are defined locally to avoid any dependency on @google/genai.
@@ -111,6 +114,10 @@ export class OllamaChat {
     this.history.push(userContent);
 
     const messages = this.history.map(toOllamaMessage);
+    // TODO: environment is still being forgotten in the middle of the system instruction.
+    debugLogger.log('[OllamaChat] system instruction:', this.systemInstruction);
+    await fs.writeFile('agent.txt', this.systemInstruction ?? '');
+    console.log('[DEBUG] System Instruction saved to agent.txt');
     if (this.systemInstruction) {
       messages.unshift({
         role: 'system',
@@ -132,10 +139,11 @@ export class OllamaChat {
       });
 
       const modelResponseParts: Part[] = [];
-      // let accumulatedText = '';
+      let accumulatedText = '';
       for await (const chunk of stream) {
         const chunkText = chunk.message.content;
-        // accumulatedText += chunkText;
+        accumulatedText += chunkText;
+        // debugLogger.log('[OllamaChat] Accumulated text:', accumulatedText);
         modelResponseParts.push({ text: chunkText });
 
         const responseChunk: GenerateContentResponse = {
@@ -143,8 +151,8 @@ export class OllamaChat {
             {
               content: {
                 role: 'model',
-                // parts: [{ text: accumulatedText }],
-                parts: [{ text: chunkText }],
+                parts: [{ text: accumulatedText }],
+                // parts: [{ text: chunkText }],
               },
             },
           ],
@@ -155,7 +163,6 @@ export class OllamaChat {
           responseChunk.candidates![0].finishReason = 'STOP';
         }
 
-        // Yield to the UI
         yield { type: StreamEventType.CHUNK, value: responseChunk };
       }
 

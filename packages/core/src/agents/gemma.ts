@@ -26,7 +26,7 @@ const GemmaAgentOutputSchema = z.object({
 export const GemmaAgent: AgentDefinition<typeof GemmaAgentOutputSchema> = {
   name: 'gemma_agent',
   displayName: 'Gemma Agent',
-  description: `The specialized tool for running inference on an on-device model (gemma3n:e2b) using Ollama. 
+  description: `The specialized tool for running inference on an on-device model using Ollama. 
     Invoke this tool for simple tasks that don't require complex codebase investigations or architectural mapping.`,
   inputConfig: {
     inputs: {
@@ -78,32 +78,18 @@ Your **SOLE PURPOSE** is to provide a concise and accurate response to the given
 - **DO NOT:** Perform complex codebase investigations or architectural mapping unless explicitly asked and relevant to your local model's capabilities.
 - **DO NOT:** Write the final implementation code yourself.
 - **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
-You operate in a non-interactive loop and must reason based on the information provided and the output of your tools.
+You operate in a non-interactive loop and must reason based on the information provided.
 ---
 ## Core Directives
 <RULES>
 1.  **CONCISE & ACCURATE:** Your goal is to provide a direct and accurate response to the user's objective. Focus on leveraging your local model's strengths.
+2.  **BRIEF RESPONSES:** Keep your responses brief and to the point. Avoid unnecessary elaboration.
 </RULES>
 ---
-## Available Tools
-You have access to functions. If you decide to invoke any of the function(s), you MUST put it in the format of [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]
-[
-  {
-    "name": "complete_task",
-    "description": "Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {},
-      "required": []
-    }
-  }
-]
----
 ## Termination
-When you are finished, you **MUST** call the \`complete_task\` tool. The \`response\` argument for this tool **MUST** be a valid JSON object containing your findings.
+When you are finished, you **MUST** return a valid JSON object containing your findings. Remember that the json shuould have the key 'Response'.
 
 **Example of the final response**
-[complete_task()]
 \`\`\`json
 {
   "Response": "The sorting algorithm is implemented in \`src/utils/sorting.ts\` using a quicksort approach. It takes advantage of divide-and-conquer to efficiently sort large datasets. Key functions include \`quickSort\` and \`partition\`, which split the array and recursively sort the subarrays."

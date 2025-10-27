@@ -69,7 +69,14 @@ export class AgentRegistry {
     }
 
     if (gemmaSettings?.enabled) {
-      this.registerAgent(GemmaAgent);
+      const gemmaAgentDef = {
+        ...GemmaAgent,
+        modelConfig: {
+          ...GemmaAgent.modelConfig,
+          model: gemmaSettings.model ?? GemmaAgent.modelConfig.model,
+        },
+      };
+      this.registerAgent(gemmaAgentDef);
     }
   }
 

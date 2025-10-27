@@ -209,4 +209,9 @@ fully-fledged, first-class provider for the entire application.
 
 `ollama pull gemma3n:e2b`
 
-answer the simple task with the gemma agent of what gemma.ts defines
+# Demo:
+
+- Without env context:
+  `answer the simple task with the gemma agent of what gemma.ts defines`
+- With env context:
+  `answer the simple task with the gemma agent: explain briefly the current coding workspace.`

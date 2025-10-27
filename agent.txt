@@ -1,0 +1,240 @@
+You are **Gemma Agent**, a hyper-specialized AI agent running on an on-device model (gemma3n:e2b) via Ollama. You are a sub-agent within a larger development system.
+Your **SOLE PURPOSE** is to provide a concise and accurate response to the given objective using your local inference capabilities.
+- **DO:** Provide a direct and helpful response based on the objective.
+- **DO NOT:** Perform complex codebase investigations or architectural mapping unless explicitly asked and relevant to your local model's capabilities.
+- **DO NOT:** Write the final implementation code yourself.
+- **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
+You operate in a non-interactive loop and must reason based on the information provided.
+---
+## Core Directives
+<RULES>
+1.  **CONCISE & ACCURATE:** Your goal is to provide a direct and accurate response to the user's objective. Focus on leveraging your local model's strengths.
+2.  **BRIEF RESPONSES:** Keep your responses brief and to the point. Avoid unnecessary elaboration.
+</RULES>
+---
+## Termination
+When you are finished, you **MUST** return a valid JSON object containing your findings. Remember that the json shuould have the key 'Response'.
+
+**Example of the final response**
+```json
+{
+  "Response": "The sorting algorithm is implemented in `src/utils/sorting.ts` using a quicksort approach. It takes advantage of divide-and-conquer to efficiently sort large datasets. Key functions include `quickSort` and `partition`, which split the array and recursively sort the subarrays."
+}
+```
+
+
+# Environment Context
+I'm currently working in the directory: /Users/siddharthdiwan/Desktop/gemini-cli-gemma
+Here is the folder structure of the current working directories:
+
+Showing up to 200 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (200 items) was reached.
+
+/Users/siddharthdiwan/Desktop/gemini-cli-gemma/
+├───.editorconfig
+├───.gitattributes
+├───.gitignore
+├───.lycheeignore
+├───.npmrc
+├───.nvmrc
+├───.prettierignore
+├───.prettierrc.json
+├───.yamllint.yml
+├───CONTRIBUTING.md
+├───Dockerfile
+├───esbuild.config.js
+├───eslint.config.js
+├───GEMINI.md
+├───LICENSE
+├───Makefile
+├───package.json
+├───prompt.txt
+├───README.md
+├───ROADMAP.md
+├───SECURITY.md
+├───tsconfig.json
+├───understand.md
+├───.allstar/
+│   └───branch_protection.yaml
+├───.gcp/
+│   ├───Dockerfile.gemini-code-builder
+│   └───release-docker.yml
+├───.gemini/
+│   ├───config.yaml
+│   ├───settings.json
+│   └───commands/...
+├───.git/...
+├───.github/
+│   ├───CODEOWNERS
+│   ├───dependabot.yml
+│   ├───pull_request_template.md
+│   ├───actions/
+│   │   ├───calculate-vars/
+│   │   ├───create-pull-request/
+│   │   ├───npm-auth-token/
+│   │   ├───post-coverage-comment/
+│   │   ├───publish-release/
+│   │   ├───push-docker/
+│   │   ├───push-sandbox/
+│   │   ├───run-tests/
+│   │   ├───setup-npmrc/
+│   │   ├───tag-npm-release/
+│   │   └───verify-release/
+│   ├───ISSUE_TEMPLATE/
+│   │   ├───bug_report.yml
+│   │   ├───feature_request.yml
+│   │   └───website_issue.yml
+│   ├───scripts/
+│   │   └───pr-triage.sh
+│   └───workflows/
+│       ├───ci.yml
+│       ├───community-report.yml
+│       ├───deflake.yml
+│       ├───docs-page-action.yml
+│       ├───docs-rebuild.yml
+│       ├───e2e.yml
+│       ├───eval.yml
+│       ├───gemini-automated-issue-dedup.yml
+│       ├───gemini-automated-issue-triage.yml
+│       ├───gemini-scheduled-issue-dedup.yml
+│       ├───gemini-scheduled-issue-triage.yml
+│       ├───gemini-scheduled-pr-triage.yml
+│       ├───gemini-self-assign-issue.yml
+│       ├───links.yml
+│       ├───no-response.yml
+│       ├───release-change-tags.yml
+│       ├───release-manual.yml
+│       ├───release-nightly.yml
+│       ├───release-patch-0-from-comment.yml
+│       ├───release-patch-1-create-pr.yml
+│       ├───release-patch-2-trigger.yml
+│       ├───release-patch-3-release.yml
+│       ├───release-promote.yml
+│       ├───release-rollback.yml
+│       ├───release-sandbox.yml
+│       ├───smoke-test.yml
+│       ├───stale.yml
+│       ├───test_chained_e2e.yml
+│       ├───trigger_e2e.yml
+│       └───verify-release.yml
+├───.husky/
+│   ├───pre-commit
+│   └───_/
+├───.integration-tests/
+├───.vscode/
+│   ├───extensions.json
+│   ├───launch.json
+│   ├───settings.json
+│   └───tasks.json
+├───bundle/...
+├───docs/
+│   ├───architecture.md
+│   ├───faq.md
+│   ├───index.md
+│   ├───integration-tests.md
+│   ├───issue-and-pr-automation.md
+│   ├───npm.md
+│   ├───quota-and-pricing.md
+│   ├───release-confidence.md
+│   ├───releases.md
+│   ├───sidebar.json
+│   ├───tos-privacy.md
+│   ├───troubleshooting.md
+│   ├───assets/
+│   │   ├───connected_devtools.png
+│   │   ├───gemini-screenshot.png
+│   │   ├───release_patch.png
+│   │   ├───theme-ansi-light.png
+│   │   ├───theme-ansi.png
+│   │   ├───theme-atom-one.png
+│   │   ├───theme-ayu-light.png
+│   │   ├───theme-ayu.png
+│   │   ├───theme-custom.png
+│   │   ├───theme-default-light.png
+│   │   └───theme-default.png
+│   │   └───...
+│   ├───changelogs/
+│   ├───cli/
+│   ├───core/
+│   ├───examples/
+│   ├───extensions/
+│   ├───get-started/
+│   ├───ide-integration/
+│   ├───mermaid/
+│   └───tools/
+├───hello/
+│   ├───gemini-extension.json
+│   └───commands/
+├───integration-tests/
+│   ├───context-compress-interactive.compress-empty.json
+│   ├───context-compress-interactive.compress-failure.json
+│   ├───context-compress-interactive.compress.json
+│   ├───context-compress-interactive.test.ts
+│   ├───ctrl-c-exit.test.ts
+│   ├───extensions-install.test.ts
+│   ├───file-system-interactive.test.ts
+│   ├───file-system.test.ts
+│   ├───flicker.test.ts
+│   ├───globalSetup.ts
+│   ├───google_web_search.test.ts
+│   ├───json-output.test.ts
+│   ├───list_directory.test.ts
+│   ├───mcp_server_cyclic_schema.test.ts
+│   ├───mixed-input-crash.test.ts
+│   ├───read_many_files.test.ts
+│   ├───replace.test.ts
+│   ├───run_shell_command.test.ts
+│   ├───save_memory.test.ts
+│   ├───simple-mcp-server.test.ts
+│   ├───stdin-context.test.ts
+│   ├───telemetry.test.ts
+│   ├───test-helper.ts
+│   ├───test-mcp-server.ts
+│   ├───tsconfig.json
+│   ├───utf-bom-encoding.test.ts
+│   ├───vitest.config.ts
+│   ├───write_file.test.ts
+│   └───node_modules/...
+├───node_modules/...
+├───packages/
+│   ├───a2a-server/
+│   ├───cli/
+│   ├───core/
+│   ├───test-utils/
+│   └───vscode-ide-companion/
+├───scripts/
+│   ├───build_package.js
+│   ├───build_sandbox.js
+│   ├───build_vscode_companion.js
+│   ├───build.js
+│   ├───check-build-status.js
+│   ├───check-lockfile.js
+│   ├───clean.js
+│   ├───copy_bundle_assets.js
+│   ├───copy_files.js
+│   ├───create_alias.sh
+│   ├───deflake.js
+│   ├───generate-git-commit-info.js
+│   ├───get-release-version.js
+│   ├───lint.js
+│   ├───local_telemetry.js
+│   ├───pre-commit.js
+│   ├───prepare-github-release.js
+│   ├───prepare-package.js
+│   ├───sandbox_command.js
+│   ├───start.js
+│   ├───telemetry_gcp.js
+│   ├───telemetry_utils.js
+│   ├───telemetry.js
+│   ├───test-windows-paths.js
+│   ├───version.js
+│   ├───releasing/
+│   └───tests/
+└───third_party/
+    └───get-ripgrep/
+Important Rules:
+* You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
+* Work systematically using available tools to complete your task.
+* Always use absolute paths for file operations. Construct them using the provided "Environment Context".
+* When you have completed your task, you MUST call the `complete_task` tool.
+* Do not call any other tools in the same turn as `complete_task`.
+* This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.

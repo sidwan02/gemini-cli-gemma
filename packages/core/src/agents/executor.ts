@@ -365,6 +365,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     // TODO: add console.log(JSON.stringify(tools, null, 2)) to the system prompt to make the gemma model aware of tool calls.
     // TODO: need to do regex handling of function calls in the ollamaChat interface and then return it as chunk.functionCalls
 
+    debugLogger.log('[Debug] Calling Ollama model.');
+
     const responseStream = await chat.sendMessageStream(
       this.definition.modelConfig.model,
       messageParams,
@@ -381,10 +383,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         const text = parts?.map((p) => p.text).join('') || '';
 
+        // TODO: when I do this.emitActivity('THOUGHT_CHUNK', { text }); it updates the terminal to be the new chunk every time, but if I do this.emitActivity('THOUGHT_CHUNK', { textResponse }); then it doesn't update at all, even though I am verifying in the debuglogger.log that tht textresponse is updating properly? this is in executor.ts
         if (text) {
-          textResponse += text;
+          // textResponse += text;
+          textResponse = text;
           // For Ollama, we'll treat all output as a "thought" for now
-          this.emitActivity('THOUGHT_CHUNK', { textResponse });
+          // debugLogger.log(
+          //   '[Debug] Emitting thought chunk from Ollama response: ',
+          //   textResponse,
+          // );
+          // TODO: emitActivity only works if it's a const value.
+          this.emitActivity('THOUGHT_CHUNK', { text });
+
+          // this.emitActivity('THOUGHT_CHUNK', { textResponse });
         }
       }
     }
@@ -448,6 +459,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     const systemInstruction = promptConfig.systemPrompt
       ? await this.buildSystemPrompt(inputs)
       : undefined;
+
+    // debugLogger.log(
+    //   '[AgentExecutor] Creating chat object with system instruction:',
+    //   systemInstruction,
+    // );
 
     if ('host' in modelConfig) {
       return new OllamaChat(
@@ -795,8 +811,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
     // Append environment context (CWD and folder structure).
+    // // eslint-disable-next-line no-constant-condition
+    // if (false) {
     const dirContext = await getDirectoryContextString(this.runtimeContext);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
+    // }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `
