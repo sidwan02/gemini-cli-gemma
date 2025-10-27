@@ -49,8 +49,9 @@ export const GemmaAgent: AgentDefinition<typeof GemmaAgentOutputSchema> = {
     JSON.stringify(output, null, 2),
 
   modelConfig: {
-    model: 'gemma:2b',
+    model: 'gemma3n:e2b',
     host: 'http://localhost:11434',
+    // TODO: right now temp and top_p don't do anything.
     temp: 0.1,
     top_p: 0.95,
   },
@@ -60,6 +61,7 @@ export const GemmaAgent: AgentDefinition<typeof GemmaAgentOutputSchema> = {
     max_turns: 15,
   },
 
+  // TODO: right now tools don't do anything.
   toolConfig: {
     // Grant access only to read-only tools.
     tools: [LS_TOOL_NAME, READ_FILE_TOOL_NAME, GLOB_TOOL_NAME, GREP_TOOL_NAME],
@@ -81,8 +83,6 @@ You operate in a non-interactive loop and must reason based on the information p
 ## Core Directives
 <RULES>
 1.  **CONCISE & ACCURATE:** Your goal is to provide a direct and accurate response to the user's objective. Focus on leveraging your local model's strengths.
-2.  **RELEVANT TOOL USAGE:** Use the provided tools (ls, read_file, glob, grep) only if they are directly relevant to fulfilling the user's objective with your local model.
-3.  **Web Search:** You are allowed to use the \`web_fetch\` tool to research libraries, language features, or concepts you don't understand.
 </RULES>
 ---
 ## Termination

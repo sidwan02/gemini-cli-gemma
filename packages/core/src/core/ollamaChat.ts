@@ -6,6 +6,7 @@
 
 import { Ollama } from 'ollama';
 import type { OllamaModelConfig } from '../agents/types.js';
+// import { debugLogger } from '../utils/debugLogger.js';
 
 // #region Self-contained types
 // These types are defined locally to avoid any dependency on @google/genai.
@@ -77,7 +78,7 @@ export class OllamaChat {
    */
   async sendMessageStream(
     _model: string, // model is part of the constructor config for Ollama
-    params: { message: string | Part[] },
+    params: { message: string | Part[]; config?: Record<string, unknown> },
   ): Promise<AsyncGenerator<StreamEvent>> {
     const userParts: Part[] = Array.isArray(params.message)
       ? (params.message as Part[])
@@ -106,8 +107,10 @@ export class OllamaChat {
       });
 
       const modelResponseParts: Part[] = [];
+      let accumulatedText = '';
       for await (const chunk of stream) {
         const chunkText = chunk.message.content;
+        accumulatedText += chunkText;
         modelResponseParts.push({ text: chunkText });
 
         const responseChunk: GenerateContentResponse = {
@@ -115,7 +118,7 @@ export class OllamaChat {
             {
               content: {
                 role: 'model',
-                parts: [{ text: chunkText }],
+                parts: [{ text: accumulatedText }],
               },
             },
           ],
@@ -126,6 +129,7 @@ export class OllamaChat {
           responseChunk.candidates![0].finishReason = 'STOP';
         }
 
+        // Yield to the UI
         yield { type: StreamEventType.CHUNK, value: responseChunk };
       }
 

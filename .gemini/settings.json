@@ -2,6 +2,9 @@
   "experimental": {
     "codebaseInvestigatorSettings": {
       "enabled": true
+    },
+    "gemmaSettings": {
+      "enabled": true
     }
   }
 }

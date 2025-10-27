@@ -272,7 +272,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     if (chat instanceof GeminiChat) {
       return this.callGeminiModel(chat, message, tools, signal, promptId);
     } else if (chat instanceof OllamaChat) {
-      return this.callOllamaModel(chat, message, signal);
+      return this.callOllamaModel(chat, message, tools, signal);
     } else {
       throw new Error('Unsupported chat object type');
     }
@@ -346,12 +346,22 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    */
   private async callOllamaModel(
     chat: OllamaChat,
+    // TODO: later this should not take in a GeminiContent but a more generic type. it's fine for now since `currentMessage` is very basic.
+    // TODO: also handle conversion of toolResponseParts since that is the returned value from the `processFunctionCalls`: `nextMessage`.
+    // TODO: Verify how the tool calling is even handled for gemma.ts right now. It probably won't work since the tools function dectorators can be directly passed to Gemini but not to Ollama.
     message: GeminiContent,
+    tools: FunctionDeclaration[],
     signal: AbortSignal,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
     const messageParams = {
       message: (message.parts || []) as OllamaPart[],
+      config: {
+        tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
+      },
     };
+
+    // TODO: add console.log(JSON.stringify(tools, null, 2)) to the system prompt to make the gemma model aware of tool calls.
+    // TODO: need to do regex handling of function calls in the ollamaChat interface and then return it as chunk.functionCalls
 
     const responseStream = await chat.sendMessageStream(
       this.definition.modelConfig.model,
@@ -377,8 +387,22 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // Ollama does not support function calls.
-    return { functionCalls: [], textResponse };
+    // For now, we'll assume the Ollama model always calls complete_task at the end of each turn. It cannot handle other kinds of tools.
+    const completeTaskDeclaration = tools.find(
+      (tool) => tool.name === TASK_COMPLETE_TOOL_NAME,
+    );
+
+    let functionCalls: FunctionCall[] = [];
+    if (completeTaskDeclaration) {
+      debugLogger.log('[Debug] Ollama complete_task tool detected.');
+      const completeTaskFunctionCall: FunctionCall = {
+        name: completeTaskDeclaration.name,
+        args: { response: textResponse },
+        id: 'ollama-complete-task',
+      };
+      functionCalls = [completeTaskFunctionCall];
+    }
+    return { functionCalls, textResponse };
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
@@ -474,6 +498,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       });
 
       if (functionCall.name === TASK_COMPLETE_TOOL_NAME) {
+        debugLogger.log('[AgentExecutor] Processing complete_task tool call.');
         if (taskCompleted) {
           // We already have a completion from this turn. Ignore subsequent ones.
           const error =
@@ -497,12 +522,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         taskCompleted = true; // Signal completion regardless of output presence
 
         if (outputConfig) {
+          debugLogger.log(
+            '[AgentExecutor] Validating output for complete_task tool call.',
+          );
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
             const outputValue = args[outputName];
             const validationResult = outputConfig.schema.safeParse(outputValue);
 
             if (!validationResult.success) {
+              debugLogger.log(
+                '[AgentExecutor] Output validation failed:',
+                validationResult.error.flatten(),
+              );
               taskCompleted = false; // Validation failed, revoke completion
               const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
               syncResponseParts.push({
@@ -519,6 +551,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
               });
               continue;
             }
+
+            debugLogger.log('[AgentExecutor] Output validation succeeded.');
 
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
@@ -558,6 +592,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             });
           }
         } else {
+          debugLogger.log(
+            '[AgentExecutor] No output expected. Just signal completion.',
+          );
           // No output expected. Just signal completion.
           submittedOutput = 'Task completed successfully.';
           syncResponseParts.push({

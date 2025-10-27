@@ -1,5 +1,5 @@
 ```
-npm run clean; npm run build; npm start --debug
+npm run clean; npm run build; npm start
 ```
 
 # Handling Tool Calls
@@ -206,3 +206,5 @@ cares which LLM provider is being used, achieving true separation of concerns.
 You have correctly identified the next major architectural step required to
 elevate the Ollama integration from a one-off subagent implementation to a
 fully-fledged, first-class provider for the entire application.
+
+`ollama pull gemma3n:e2b`

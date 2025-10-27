@@ -6,6 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
+import { GemmaAgent } from './gemma.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -36,6 +37,7 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const gemmaSettings = this.config.getGemmaSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -64,6 +66,10 @@ export class AgentRegistry {
           (CodebaseInvestigatorAgent.modelConfig as ModelConfig).thinkingBudget;
       }
       this.registerAgent(agentDef);
+    }
+
+    if (gemmaSettings?.enabled) {
+      this.registerAgent(GemmaAgent);
     }
   }
 

@@ -664,6 +664,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    gemmaSettings: settings.experimental?.gemmaSettings,
     fakeResponses: argv.fakeResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,

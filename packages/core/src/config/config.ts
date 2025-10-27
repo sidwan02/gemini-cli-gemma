@@ -125,6 +125,12 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
+export interface GemmaSettings {
+  enabled?: boolean;
+  model?: string;
+  host?: string;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -280,6 +286,7 @@ export interface ConfigParameters {
   useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  gemmaSettings?: GemmaSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -379,6 +386,7 @@ export class Config {
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly gemmaSettings: GemmaSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -486,6 +494,11 @@ export class Config {
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+    };
+    this.gemmaSettings = {
+      enabled: params.gemmaSettings?.enabled ?? false,
+      model: params.gemmaSettings?.model ?? 'gemma3n:e2b',
+      host: params.gemmaSettings?.host ?? 'http://localhost:11434',
     };
     // debugLogger.log(
     //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,
@@ -1100,6 +1113,10 @@ export class Config {
     return this.codebaseInvestigatorSettings;
   }
 
+  getGemmaSettings(): GemmaSettings {
+    return this.gemmaSettings;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.eventEmitter);
 
@@ -1196,6 +1213,28 @@ export class Config {
       const definition = this.agentRegistry.getDefinition(
         'codebase_investigator',
       );
+      if (definition) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
+          const messageBusEnabled = this.getEnableMessageBusIntegration();
+          const wrapper = new SubagentToolWrapper(
+            definition,
+            this,
+            messageBusEnabled ? this.getMessageBus() : undefined,
+          );
+          registry.registerTool(wrapper);
+        }
+      }
+    }
+    if (this.getGemmaSettings().enabled) {
+      const definition = this.agentRegistry.getDefinition('gemma_agent');
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
         const excludeTools = this.getExcludeTools() || [];
