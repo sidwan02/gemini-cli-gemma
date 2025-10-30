@@ -215,3 +215,59 @@ fully-fledged, first-class provider for the entire application.
   `answer the simple task with the gemma agent of what gemma.ts defines`
 - With env context:
   `answer the simple task with the gemma agent: explain briefly the current coding workspace.`
+
+# Litellm setup
+
+```
+pip install -e ".[proxy]"
+python litellm/proxy/proxy_cli.py --config=litellm/proxy/proxy_config.yaml
+
+
+export LITELLM_MASTER_KEY="sk-1234"
+export GOOGLE_GEMINI_BASE_URL="http://localhost:4000"
+export GEMINI_API_KEY="sk-1234"
+```
+
+get the litellm master key from http://0.0.0.0:4000/sso/key/generate
+
+current models
+
+```
+curl -X 'GET' \
+  'http://0.0.0.0:4000/models?return_wildcard_routes=false&include_model_access_groups=false&only_model_access_groups=false&include_metadata=false' \
+  -H 'accept: application/json'
+```
+
+```
+curl -X POST 'http://0.0.0.0:4000/chat/completions' \
+-H 'Content-Type: application/json' \
+-H 'Authorization: Bearer sk-1234' \
+-d '{
+    "model": "gemini/gemini-2.5-flash",
+    "messages": [
+      {
+        "role": "user",
+        "content": "tell me about yourself."
+      }
+    ]
+}'
+
+curl -L -X POST 'http://localhost:4000/v1beta/models/gemini-2.5-flash-lite:generateContent' \
+-H 'content-type: application/json' \
+-H 'authorization: Bearer sk-1234' \
+-d '{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Write a short story about AI"
+        }
+      ],
+      "role": "user"
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 100
+  }
+}'
+```
