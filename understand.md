@@ -220,6 +220,8 @@ fully-fledged, first-class provider for the entire application.
 
 ```
 pip install -e ".[proxy]"
+
+source .venv/bin/activate
 python litellm/proxy/proxy_cli.py --config=litellm/proxy/proxy_config.yaml
 
 
@@ -250,6 +252,56 @@ curl -X POST 'http://0.0.0.0:4000/chat/completions' \
         "content": "tell me about yourself."
       }
     ]
+}'
+
+curl -X POST 'http://0.0.0.0:4000/chat/completions' \
+-H 'Content-Type: application/json' \
+-H 'Authorization: Bearer sk-1234' \
+-d '{
+    "model": "gemma3n:e2b",
+    "messages": [
+      {
+        "role": "user",
+        "content": "tell me about yourself."
+      }
+    ]
+}'
+
+curl -X POST 'http://0.0.0.0:4000/chat/completions' \
+-H 'Content-Type: application/json' \
+-H 'Authorization: Bearer sk-1234' \
+-d '{
+    "model": "gemma3n:e2b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What'\''s the weather like in Boston today?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_current_weather",
+        "description": "Get the current weather in a given location",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state, e.g. San Francisco, CA"
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["celsius", "fahrenheit"]
+            }
+          },
+          "required": ["location"]
+        }
+      }
+    }
+  ],
+  "stream": true
 }'
 
 curl -L -X POST 'http://localhost:4000/v1beta/models/gemini-2.5-flash-lite:generateContent' \
