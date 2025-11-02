@@ -222,6 +222,12 @@ Using the codebase investigator: tell me how the ollama inference works.
 - With env context:
   `answer the simple task with the gemma agent: explain briefly the current coding workspace.`
 
+# TODO:
+
+1. See if gemma subagent can terminate correctly.
+2. Make the emitting such that the intermediate tool calls and responses are all
+   displayed just like in the main loop conversation.
+
 # Litellm setup
 
 ```

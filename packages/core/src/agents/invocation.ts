@@ -78,7 +78,12 @@ export class SubagentInvocation<
   ): Promise<ToolResult> {
     try {
       if (updateOutput) {
-        updateOutput('Subagent starting...\n');
+        updateOutput(
+          `GEMINI_SUBAGENT_START::${JSON.stringify({
+            agentName: this.definition.name,
+            inputs: this.params,
+          })}`,
+        );
       }
 
       // Create an activity callback to bridge the executor's events to the
@@ -86,11 +91,34 @@ export class SubagentInvocation<
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
 
-        if (
-          activity.type === 'THOUGHT_CHUNK' &&
-          typeof activity.data['text'] === 'string'
-        ) {
-          updateOutput(`🤖💭 ${activity.data['text']}`);
+        switch (activity.type) {
+          case 'THOUGHT_CHUNK':
+            if (typeof activity.data['text'] === 'string') {
+              updateOutput(
+                `GEMINI_SUBAGENT_THOUGHT::${JSON.stringify({
+                  thought: activity.data['text'],
+                })}`,
+              );
+            }
+            break;
+          case 'TOOL_CALL_START':
+            updateOutput(
+              `GEMINI_SUBAGENT_TOOL_CALL::${JSON.stringify(activity.data)}`,
+            );
+            break;
+          case 'TOOL_CALL_END':
+            updateOutput(
+              `GEMINI_SUBAGENT_TOOL_RESPONSE::${JSON.stringify(activity.data)}`,
+            );
+            break;
+          case 'ERROR':
+            updateOutput(
+              `GEMINI_SUBAGENT_ERROR::${JSON.stringify(activity.data)}`,
+            );
+            break;
+          default:
+            // Unknown activity type — ignore to satisfy exhaustive switch requirement.
+            break;
         }
       };
 

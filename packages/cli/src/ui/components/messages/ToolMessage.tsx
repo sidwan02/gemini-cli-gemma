@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { IndividualToolCallDisplay } from '../../types.js';
+import type { IndividualToolCallDisplay , SubagentHistoryItem } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
@@ -22,6 +22,7 @@ import {
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { SubagentHistoryDisplay } from './SubagentHistoryDisplay.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -41,6 +42,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
   config?: Config;
+  subagentHistory?: SubagentHistoryItem[];
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -56,6 +58,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   embeddedShellFocused,
   ptyId,
   config,
+  subagentHistory,
 }) => {
   const { renderMarkdown } = useUIState();
   const isThisShellFocused =
@@ -141,7 +144,15 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         )}
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
-      {resultDisplay && (
+      {subagentHistory && (
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
+          <SubagentHistoryDisplay
+            history={subagentHistory}
+            terminalWidth={terminalWidth}
+          />
+        </Box>
+      )}
+      {resultDisplay && !subagentHistory && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
             {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
