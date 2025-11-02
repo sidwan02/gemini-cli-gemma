@@ -211,8 +211,14 @@ fully-fledged, first-class provider for the entire application.
 
 # Demo:
 
+Codebase investigator.
+
+Using the codebase investigator: tell me how the ollama inference works.
+
 - Without env context:
   `answer the simple task with the gemma agent of what gemma.ts defines`
+  `answer the simple task if the gemma agent: what files are related to ollama?`
+
 - With env context:
   `answer the simple task with the gemma agent: explain briefly the current coding workspace.`
 

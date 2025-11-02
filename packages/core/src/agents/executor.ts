@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { Type } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -274,7 +276,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     if (chat instanceof GeminiChat) {
       return this.callGeminiModel(chat, message, tools, signal, promptId);
     } else if (chat instanceof OllamaChat) {
-      return this.callOllamaModel(chat, message, tools, signal);
+      return this.callOllamaModel(chat, message, tools, signal, promptId);
     } else {
       throw new Error('Unsupported chat object type');
     }
@@ -343,6 +345,135 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     return { functionCalls, textResponse };
   }
 
+  // TODO: test this.
+  /**
+   * Parses a string containing Ollama tool calls into an array of FunctionCall objects.
+   * @param text The string to parse.
+   * @returns An array of FunctionCall objects.
+   */
+  private _parseOllamaToolCalls(
+    text: string,
+    promptId: string,
+  ): FunctionCall[] {
+    const strippedText = stripJsonMarkdown(text);
+    debugLogger.log(
+      `[Debug] Parsing Ollama tool calls from text: ${strippedText}`,
+    );
+    const functionCalls: FunctionCall[] = [];
+
+    try {
+      const parsedJson = JSON.parse(strippedText);
+
+      const processJsonToolCall = (
+        toolCall: unknown,
+        index: number,
+      ): FunctionCall | null => {
+        if (
+          typeof toolCall === 'object' &&
+          toolCall !== null &&
+          'name' in toolCall &&
+          'parameters' in toolCall
+        ) {
+          const tc = toolCall as {
+            name: string;
+            parameters: Record<string, unknown>;
+          };
+          if (typeof tc.name === 'string') {
+            return {
+              // id: `${promptId}-ollama-${index}`,
+              name: tc.name,
+              args: tc.parameters,
+            };
+          }
+        }
+        return null;
+      };
+
+      if (Array.isArray(parsedJson)) {
+        for (const [index, item] of parsedJson.entries()) {
+          const functionCall = processJsonToolCall(item, index);
+          if (functionCall) {
+            functionCalls.push(functionCall);
+          }
+        }
+      } else {
+        const functionCall = processJsonToolCall(parsedJson, 0);
+        if (functionCall) {
+          functionCalls.push(functionCall);
+        }
+      }
+
+      if (functionCalls.length > 0) {
+        debugLogger.log(
+          `[Debug] Parsed Ollama tool calls from JSON: ${JSON.stringify(
+            functionCalls,
+          )}`,
+        );
+        return functionCalls;
+      }
+    } catch (e) {
+      // Not a valid JSON, proceed with regex parsing
+      debugLogger.log(
+        '[Debug] Failed to parse tool calls as JSON, falling back to regex.',
+      );
+    }
+
+    // This regex finds patterns like `function_name(anything_inside)`.
+    const toolCallRegex = /(\w+)\((.*?)\)/g;
+    let match;
+
+    // The model might return tool calls wrapped in [].
+    const content =
+      strippedText.trim().startsWith('[') && strippedText.trim().endsWith(']')
+        ? strippedText.trim().slice(1, -1)
+        : strippedText.trim();
+
+    while ((match = toolCallRegex.exec(content)) !== null) {
+      const name = match[1];
+      const argsString = match[2];
+      debugLogger.log(
+        `[Debug] Found tool call: ${name} with args: ${argsString}`,
+      );
+      const args: { [key: string]: unknown } = {};
+
+      if (argsString) {
+        // This regex handles key-value pairs, including quoted values that may contain commas.
+        const argRegex = /(\w+)=(".*?"|'.*?'|[^,]+)/g;
+        let argMatch;
+        while ((argMatch = argRegex.exec(argsString)) !== null) {
+          const key = argMatch[1];
+          let value: unknown = argMatch[2].trim();
+
+          // Basic type inference
+          if (typeof value === 'string') {
+            if (
+              (value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith(`'`) && value.endsWith(`'`))
+            ) {
+              value = value.slice(1, -1);
+            } else if (!isNaN(Number(value)) && value.trim() !== '') {
+              value = Number(value);
+            } else if (value === 'true') {
+              value = true;
+            } else if (value === 'false') {
+              value = false;
+            }
+          }
+          args[key] = value;
+        }
+      }
+      functionCalls.push({
+        id: `${promptId}-ollama-${functionCalls.length}`,
+        name,
+        args,
+      });
+    }
+    debugLogger.log(
+      `[Debug] Parsed Ollama tool calls: ${JSON.stringify(functionCalls)}`,
+    );
+    return functionCalls;
+  }
+
   /**
    * Calls the Ollama model with the given message.
    */
@@ -350,10 +481,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     chat: OllamaChat,
     // TODO: later this should not take in a GeminiContent but a more generic type. it's fine for now since `currentMessage` is very basic.
     // TODO: also handle conversion of toolResponseParts since that is the returned value from the `processFunctionCalls`: `nextMessage`.
-    // TODO: Verify how the tool calling is even handled for gemma.ts right now. It probably won't work since the tools function dectorators can be directly passed to Gemini but not to Ollama.
     message: GeminiContent,
     tools: FunctionDeclaration[],
     signal: AbortSignal,
+    promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
     const messageParams = {
       message: (message.parts || []) as OllamaPart[],
@@ -361,11 +492,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
       },
     };
-
-    // TODO: add console.log(JSON.stringify(tools, null, 2)) to the system prompt to make the gemma model aware of tool calls.
-    // TODO: need to do regex handling of function calls in the ollamaChat interface and then return it as chunk.functionCalls
-
-    debugLogger.log('[Debug] Calling Ollama model.');
 
     const responseStream = await chat.sendMessageStream(
       this.definition.modelConfig.model,
@@ -400,40 +526,38 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // For now, we'll assume the Ollama model always calls complete_task at the end of each turn. It cannot handle other kinds of tools.
-    const completeTaskDeclaration = tools.find(
-      (tool) => tool.name === TASK_COMPLETE_TOOL_NAME,
-    );
+    let functionCalls = this._parseOllamaToolCalls(textResponse, promptId);
 
-    let functionCalls: FunctionCall[] = [];
-    if (completeTaskDeclaration) {
-      debugLogger.log('[Debug] Ollama complete_task tool detected.');
-      const outputName = this.definition.outputConfig?.outputName;
-      let args = {};
+    // Fallback for models that return a raw JSON for the final answer,
+    // instead of using the `complete_task` tool format.
+    if (functionCalls.length === 0 && textResponse.trim().startsWith('{')) {
+      const completeTaskDeclaration = tools.find(
+        (tool) => tool.name === TASK_COMPLETE_TOOL_NAME,
+      );
 
-      if (outputName && textResponse) {
-        try {
-          // The model is prompted to return a JSON object string.
-          // We parse it to create a structured argument for the tool call.
-          const strippedText = stripJsonMarkdown(textResponse);
-          debugLogger.log(
-            `[Debug] Stripped JSON text for parsing: ${strippedText}`,
-          );
-          args = { [outputName]: JSON.parse(strippedText) };
-        } catch (error) {
-          debugLogger.log(`[Debug] Failed to parse JSON response: ${error}`);
-          // If parsing fails, pass the raw string. The validator in
-          // `processFunctionCalls` will then fail with a clear error.
-          args = { [outputName]: textResponse };
+      if (completeTaskDeclaration) {
+        const outputName = this.definition.outputConfig?.outputName;
+        if (outputName) {
+          let args = {};
+          try {
+            const strippedText = stripJsonMarkdown(textResponse);
+            args = { [outputName]: JSON.parse(strippedText) };
+            const completeTaskFunctionCall: FunctionCall = {
+              name: completeTaskDeclaration.name,
+              args,
+              id: 'ollama-complete-task-json-fallback',
+            };
+            functionCalls = [completeTaskFunctionCall];
+          } catch (error) {
+            debugLogger.log(
+              `[Debug] Fallback JSON parsing for complete_task failed: ${error}`,
+            );
+            // If parsing fails, pass the raw string. The validator in
+            // `processFunctionCalls` will then fail with a clear error.
+            args = { [outputName]: textResponse };
+          }
         }
       }
-
-      const completeTaskFunctionCall: FunctionCall = {
-        name: completeTaskDeclaration.name,
-        args,
-        id: 'ollama-complete-task',
-      };
-      functionCalls = [completeTaskFunctionCall];
     }
     return { functionCalls, textResponse };
   }
@@ -460,10 +584,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       ? await this.buildSystemPrompt(inputs)
       : undefined;
 
-    // debugLogger.log(
-    //   '[AgentExecutor] Creating chat object with system instruction:',
-    //   systemInstruction,
-    // );
+    debugLogger.log(
+      `[AgentExecutor] Created system instruction: ${systemInstruction}`,
+    );
 
     if ('host' in modelConfig) {
       return new OllamaChat(
@@ -518,7 +641,15 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     submittedOutput: string | null;
     taskCompleted: boolean;
   }> {
+    debugLogger.log(
+      `[AgentExecutor] Processing ${functionCalls.length} function calls.`,
+    );
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
+    debugLogger.log(
+      `[AgentExecutor] Allowed tools for this agent: ${Array.from(
+        allowedToolNames,
+      ).join(', ')}`,
+    );
     // Always allow the completion tool
     allowedToolNames.add(TASK_COMPLETE_TOOL_NAME);
 
@@ -533,6 +664,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const args = (functionCall.args ?? {}) as Record<string, unknown>;
+      debugLogger.log(
+        `[AgentExecutor] Processing function call: ${functionCall.name} with ID: ${callId} and args: ${JSON.stringify(functionCall.args)}`,
+      );
 
       this.emitActivity('TOOL_CALL_START', {
         name: functionCall.name,
@@ -570,7 +704,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
             const outputValue = args[outputName];
-            // TODO: keep getting Output validation failed: { formErrors: [ 'Expected object, received string' ], fieldErrors: {} }.
             const validationResult = outputConfig.schema.safeParse(outputValue);
 
             if (!validationResult.success) {
@@ -688,6 +821,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       // Create a promise for the tool execution
+      debugLogger.log(
+        `[AgentExecutor] Scheduling execution for tool: ${functionCall.name} (ID: ${callId})`,
+      );
       const executionPromise = (async () => {
         const { response: toolResponse } = await executeToolCall(
           this.runtimeContext,
@@ -811,11 +947,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
     // Append environment context (CWD and folder structure).
-    // // eslint-disable-next-line no-constant-condition
+
     // if (false) {
     const dirContext = await getDirectoryContextString(this.runtimeContext);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
     // }
+
+    if ('host' in this.definition.modelConfig) {
+      const tools = this.prepareToolsList();
+      finalPrompt += `\n\n# Available Tools\nYou have access to functions. If you decide to invoke any of the function(s), you MUST put it in the format of [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]\n${JSON.stringify(tools, null, 2)}`;
+    }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `
