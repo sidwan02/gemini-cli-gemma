@@ -102,9 +102,21 @@ export class OllamaChat {
     _model: string, // model is part of the constructor config for Ollama
     params: { message: string | Part[]; config?: Record<string, unknown> },
   ): Promise<AsyncGenerator<StreamEvent>> {
-    const userParts: Part[] = Array.isArray(params.message)
-      ? (params.message as Part[])
-      : [{ text: params.message as string }];
+    const userParts: Part[] = [];
+    if (Array.isArray(params.message)) {
+      for (const part of params.message) {
+        if ('functionResponse' in part) {
+          // Singe gemma can't handle function responses, we convert it into a string.
+          userParts.push({ text: JSON.stringify(part.functionResponse) });
+        } else {
+          userParts.push(part as Part);
+        }
+      }
+    } else {
+      userParts.push({ text: params.message as string });
+    }
+
+    debugLogger.log('[OllamaChat] Sending user message:', userParts);
 
     const userContent: Content = {
       role: 'user',
@@ -115,9 +127,9 @@ export class OllamaChat {
 
     const messages = this.history.map(toOllamaMessage);
     // TODO: environment is still being forgotten in the middle of the system instruction.
-    debugLogger.log('[OllamaChat] system instruction:', this.systemInstruction);
+    // debugLogger.log('[OllamaChat] system instruction:', this.systemInstruction);
     await fs.writeFile('agent.txt', this.systemInstruction ?? '');
-    console.log('[DEBUG] System Instruction saved to agent.txt');
+    debugLogger.log('[DEBUG] System Instruction saved to agent.txt');
     if (this.systemInstruction) {
       messages.unshift({
         role: 'system',

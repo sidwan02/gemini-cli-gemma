@@ -1,10 +1,10 @@
 {
   "experimental": {
     "codebaseInvestigatorSettings": {
-      "enabled": true
+      "enabled": false
     },
     "gemmaSettings": {
-      "enabled": false,
+      "enabled": true,
       "model": "gemma3n:e2b"
     }
   }

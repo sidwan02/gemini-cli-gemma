@@ -229,6 +229,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           break;
         }
 
+        debugLogger.log(
+          `Next message: ${JSON.stringify(nextMessage, null, 2)}`,
+        );
+
         currentMessage = nextMessage;
       }
 
@@ -493,6 +497,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       },
     };
 
+    // debugLogger.log(
+    //   `[Debug] Sending message to Ollama model: ${JSON.stringify(messageParams, null, 2)}`,
+    // );
+
     const responseStream = await chat.sendMessageStream(
       this.definition.modelConfig.model,
       messageParams,
@@ -584,9 +592,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       ? await this.buildSystemPrompt(inputs)
       : undefined;
 
-    debugLogger.log(
-      `[AgentExecutor] Created system instruction: ${systemInstruction}`,
-    );
+    // debugLogger.log(
+    //   `[AgentExecutor] Created system instruction: ${systemInstruction}`,
+    // );
 
     if ('host' in modelConfig) {
       return new OllamaChat(
@@ -817,6 +825,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         name: functionCall.name as string,
         args,
         isClientInitiated: true,
+        isSubagent: true,
         prompt_id: promptId,
       };
 

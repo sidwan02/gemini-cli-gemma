@@ -1219,7 +1219,10 @@ export class CoreToolScheduler {
   }
 
   private isAutoApproved(toolCall: ValidatingToolCall): boolean {
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+    if (
+      this.config.getApprovalMode() === ApprovalMode.YOLO ||
+      toolCall.request.isSubagent
+    ) {
       return true;
     }
 
