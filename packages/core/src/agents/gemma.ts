@@ -61,10 +61,10 @@ export const GemmaAgent: AgentDefinition<typeof GemmaAgentOutputSchema> = {
     max_turns: 15,
   },
 
-  // TODO: right now tools don't do anything.
   toolConfig: {
     // Grant access only to read-only tools.
     tools: [LS_TOOL_NAME, READ_FILE_TOOL_NAME, GLOB_TOOL_NAME, GREP_TOOL_NAME],
+    // tools: [GLOB_TOOL_NAME],
   },
 
   promptConfig: {
@@ -80,24 +80,30 @@ Your **SOLE PURPOSE** is to make a series of tool calls to gather information fo
 - **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
 You operate in a non-interactive loop and must reason based on the information provided and the output of your tools to make more successive tool calls.
 ---
+## Available Tools
+You have access to functions. If you decide to invoke any of the function(s), you MUST put it in the format of [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]
+\${tool_code}
+---
 ## Core Directives
 <RULES>
-1.  **CONCISE & ACCURATE:** Your goal is to make tool calls to gather information and in the last tool call provide a direct and accurate response to the user's objective by condensing the responses from the previosu tool calls.
+1.  **CONCISE & ACCURATE:** Your goal is to make tool calls to gather information and in the last tool call provide a direct and accurate response to the user's objective by condensing the responses from the previous tool calls.
 2.  **RELEVANT TOOL USAGE:** Use the provided tools (ls, read_file, glob, grep) only if they are directly relevant to fulfilling the user's objective.
 3.  **NO GUESSING:** If you don't have enough information, you MUST use tool calls to gather more information. Do not make assumptions or guess.
-4.  **TOOL CALLS ONLY:** Your response MUST ONLY contain the tool call and nothing else.
+4.  **TOOL CALLS ONLY:** Your response MUST ONLY contain an explanation of what tool call you are making and the tool call itself.
 </RULES>
 ---
 ## Termination
 When you are finished, and you are very confident in your answer based on the results from your tool calls, you **MUST** call the \`complete_task\` tool. The \`response\` argument for this tool **MUST** be a valid JSON object containing your findings.
 
 **Example tool call to gather information**
+I need to...
 \`\`\`json
 {"name": "tool_call_name", "parameters": { ... }}
 \`\`\`
 
 **Example final tool call when you can fully satisfy the objective**
 \`\`\`json
+I am ready to provide the final response because...
 {"name": "complete_task", "parameters": { "Response": "The sorting algorithm is implemented in \`src/utils/sorting.ts\` using a quicksort approach. It takes advantage of divide-and-conquer to efficiently sort large datasets. Key functions include \`quickSort\` and \`partition\`, which split the array and recursively sort the subarrays." }}
 \`\`\`
 `,

@@ -952,20 +952,20 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       return '';
     }
 
-    // Inject user inputs into the prompt template.
-    let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+    const templateInputs: Record<string, unknown> = { ...inputs };
+
+    if (promptConfig.systemPrompt.includes('${tool_code}')) {
+      const tools = this.prepareToolsList();
+      const toolCode = `${JSON.stringify(tools, null, 2)}`;
+      templateInputs['tool_code'] = toolCode;
+    }
+
+    // Inject user inputs and tool code (if applicable) into the prompt template.
+    let finalPrompt = templateString(promptConfig.systemPrompt, templateInputs);
 
     // Append environment context (CWD and folder structure).
-
-    // if (false) {
     const dirContext = await getDirectoryContextString(this.runtimeContext);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
-    // }
-
-    if ('host' in this.definition.modelConfig) {
-      const tools = this.prepareToolsList();
-      finalPrompt += `\n\n# Available Tools\nYou have access to functions. If you decide to invoke any of the function(s), you MUST put it in the format of [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]\n${JSON.stringify(tools, null, 2)}`;
-    }
 
     // Append standard rules for non-interactive execution.
     finalPrompt += `

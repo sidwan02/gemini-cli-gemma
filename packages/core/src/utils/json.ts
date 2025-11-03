@@ -15,7 +15,10 @@ export function stripJsonMarkdown(text: string): string {
   const lastBrace = text.lastIndexOf('}');
 
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    return text.substring(firstBrace, lastBrace + 1);
+    let jsonText = text.substring(firstBrace, lastBrace + 1);
+    // Remove the vertical bar character and newlines that might be present in the output.
+    jsonText = jsonText.replace(/│/g, '').replace(/\n/g, '');
+    return jsonText;
   }
 
   return text;

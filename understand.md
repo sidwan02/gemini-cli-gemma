@@ -224,9 +224,9 @@ Using the codebase investigator: tell me how the ollama inference works.
 
 # TODO:
 
-1. See if gemma subagent can terminate correctly.
-2. Make the emitting such that the intermediate tool calls and responses are all
-   displayed just like in the main loop conversation.
+1. subagent tool call width should be smaller
+2. grep tool call is \*/\*\* which is way too generic need to make the tool
+   calls much more constrained
 
 # Litellm setup
 
