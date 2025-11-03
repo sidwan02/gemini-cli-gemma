@@ -6,7 +6,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { IndividualToolCallDisplay , SubagentHistoryItem } from '../../types.js';
+import type {
+  IndividualToolCallDisplay,
+  SubagentHistoryItem,
+} from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
@@ -145,10 +148,15 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
       {subagentHistory && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
+        <Box
+          borderStyle="round"
+          borderColor={theme.border.default}
+          paddingX={1}
+          marginTop={1}
+        >
           <SubagentHistoryDisplay
             history={subagentHistory}
-            terminalWidth={terminalWidth}
+            terminalWidth={terminalWidth - 2} // Account for padding
           />
         </Box>
       )}

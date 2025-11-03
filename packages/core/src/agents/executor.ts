@@ -198,7 +198,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         const promptId = `${this.agentId}#${turnCounter++}`;
 
         // The textResponse is not deconstructed from callModel, but it's used to emit/yield thoughts and streamed chunks to the UI.
-        const { functionCalls } = await promptIdContext.run(
+        const { functionCalls, textResponse } = await promptIdContext.run(
           promptId,
           async () =>
             this.callModel(chat, currentMessage, tools, signal, promptId),
@@ -225,6 +225,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (taskCompleted) {
           finalResult = submittedOutput ?? 'Task completed successfully.';
+          // Remove the complete_task tool call from the final result.
+          // This condition is only hit if outputConfig is not set (subagent
+          // doesn't have structured response/json/schema).
+          if (submittedOutput === 'Task completed successfully.') {
+            finalResult = textResponse
+              .replace('```json\n{"name": "complete_task"}\n```', '')
+              .trim();
+          }
           terminateReason = AgentTerminateMode.GOAL;
           break;
         }
@@ -375,18 +383,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         if (
           typeof toolCall === 'object' &&
           toolCall !== null &&
-          'name' in toolCall &&
-          'parameters' in toolCall
+          'name' in toolCall
         ) {
           const tc = toolCall as {
             name: string;
-            parameters: Record<string, unknown>;
+            parameters?: Record<string, unknown>;
           };
           if (typeof tc.name === 'string') {
             return {
               // id: `${promptId}-ollama-${index}`,
               name: tc.name,
-              args: tc.parameters,
+              args: tc.parameters ?? {},
             };
           }
         }
@@ -914,11 +921,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       description: outputConfig
         ? 'Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.'
         : 'Call this tool to signal that you have completed your task. This is the ONLY way to finish.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {},
-        required: [],
-      },
     };
 
     if (outputConfig) {
@@ -928,13 +930,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         definitions: _definitions,
         ...schema
       } = jsonSchema;
-      completeTool.parameters!.properties![outputConfig.outputName] =
-        schema as Schema;
-      completeTool.parameters!.required!.push(outputConfig.outputName);
+      completeTool.parameters = {
+        type: Type.OBJECT,
+        properties: {
+          [outputConfig.outputName]: schema as Schema,
+        },
+        required: [outputConfig.outputName],
+      };
     }
 
     // Gemma subagent will response in fully formatted text instead of json.
-    // toolsList.push(completeTool);
+    toolsList.push(completeTool);
 
     return toolsList;
   }
@@ -968,12 +974,10 @@ Important Rules:
 * Work systematically using available tools to complete your task.
 * Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
 
-    if (!('host' in this.definition.modelConfig)) {
-      finalPrompt += `
+    finalPrompt += `
     * When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
     * Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
     * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
-    }
 
     return finalPrompt;
   }

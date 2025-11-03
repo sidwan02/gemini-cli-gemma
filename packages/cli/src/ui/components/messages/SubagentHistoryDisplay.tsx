@@ -77,6 +77,11 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
     return acc;
   }, [] as ProcessedHistoryItem[]);
 
+  // Account for the parent container's borders/padding.
+  // '2' is a common value for a single left/right border. You might need to adjust this (e.g., to 4 or more)
+  // depending on the parent's actual padding and border setup.
+  const availableWidth = terminalWidth - 2;
+
   return (
     <Box flexDirection="column">
       {processedHistory.map((item, index) => {
@@ -86,21 +91,27 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
           return (
             <Box key={index} flexDirection="column" marginBottom={1}>
               {turn.thought && (
-                <Box flexDirection="column" marginBottom={1}>
+                <Box
+                  flexDirection="column"
+                  marginBottom={1}
+                  width={availableWidth}
+                >
                   <Text>🤖💭</Text>
                   <MarkdownDisplay
                     text={turn.thought.data.thought}
                     isPending={false}
-                    terminalWidth={terminalWidth}
+                    terminalWidth={availableWidth} // Also apply the adjusted width to MarkdownDisplay
                   />
                 </Box>
               )}
               {turn.toolCall && (
-                <SubagentToolCallDisplay
-                  toolCall={turn.toolCall}
-                  toolResponse={turn.toolResponse}
-                  terminalWidth={terminalWidth}
-                />
+                <Box width={availableWidth}>
+                  <SubagentToolCallDisplay
+                    toolCall={turn.toolCall}
+                    toolResponse={turn.toolResponse}
+                    terminalWidth={availableWidth} // Also apply the adjusted width to SubagentToolCallDisplay
+                  />
+                </Box>
               )}
             </Box>
           );
@@ -109,7 +120,12 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
         // This is a raw history item (start or error)
         if (item.type === 'start') {
           return (
-            <Box key={index} flexDirection="column" marginBottom={1}>
+            <Box
+              key={index}
+              flexDirection="column"
+              marginBottom={1}
+              width={availableWidth}
+            >
               <Text>
                 ⊶ Subagent &apos;{item.data.agentName}&apos; running with
                 inputs: {JSON.stringify(item.data.inputs)}
@@ -119,7 +135,12 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
         }
         if (item.type === 'error') {
           return (
-            <Box key={index} flexDirection="column" marginBottom={1}>
+            <Box
+              key={index}
+              flexDirection="column"
+              marginBottom={1}
+              width={availableWidth}
+            >
               <Text color="red">Error in subagent: {item.data.error}</Text>
             </Box>
           );

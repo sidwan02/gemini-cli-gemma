@@ -214,9 +214,10 @@ fully-fledged, first-class provider for the entire application.
 Using the codebase investigator: tell me how the ollama inference works.
 
 - Without env context:
-  `answer the simple task with the gemma agent of what gemma.ts defines`
-  `Use gemma agent: List all files related to ollama in the entire project. Then summarize ollamaChat.ts`
-  `What functions does gemma.ts define? remember to use gemma agent`
+  - `answer the simple task with the gemma agent of what gemma.ts defines`
+  - `Use gemma agent: List all files related to ollama in the entire project. Then summarize ollamaChat.ts`
+  - `What functions does gemma.ts define? remember to use gemma agent`
+  - `Use gemma agent: List all files related to ollama in the entire project. which file is responsible for running streamed inference in the core dir? summarize just that file.`
 
 - With env context:
   `answer the simple task with the gemma agent: explain briefly the current coding workspace.`
@@ -226,6 +227,16 @@ Using the codebase investigator: tell me how the ollama inference works.
 1. subagent tool call width should be smaller
 2. grep tool call is \*/\*\* which is way too generic need to make the tool
    calls much more constrained
+3. When reading a file that contains a prompt gets confused/breaks
+4. When reading a file that contains functions, it parses those as unauthorized
+   function calls
+5. The glob command and any patterns are always ‘single’ patterns rather than
+   more complex ones. The model should be partial to more complex regex for
+   better user experience. Eg, model never does pattern=\**/*blah\* for
+   searching, instead does pattern=blah
+6. When listing files related to a search term, unnecessarily uses
+   list_directory and doesn’t know where the files are (can’t feed the entire
+   environment either due to prompt forgetting)
 
 # Litellm setup
 

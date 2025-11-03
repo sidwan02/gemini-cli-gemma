@@ -32,13 +32,18 @@ export const SubagentToolCallDisplay: React.FC<
       : 'success'
     : 'executing';
 
+  // The width passed is the total available width.
+  // The Box component's width is for the content area, so we must subtract
+  // space for padding and borders to make the whole component fit.
+  const innerContentWidth = terminalWidth - 4 - STATUS_INDICATOR_WIDTH;
+
   return (
     <Box
       flexDirection="column"
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
-      width={terminalWidth}
+      width="100%"
     >
       <Box>
         <ToolStatusIndicator status={status} />
@@ -52,7 +57,7 @@ export const SubagentToolCallDisplay: React.FC<
           <MarkdownDisplay
             text={String(toolResponse.data.output ?? 'No output')}
             isPending={false}
-            terminalWidth={terminalWidth - STATUS_INDICATOR_WIDTH - 4}
+            terminalWidth={innerContentWidth}
           />
         </Box>
       )}
@@ -96,7 +101,9 @@ const ToolInfo: React.FC<ToolInfoProps> = ({ name, description }) => (
       <Text color={theme.text.primary} bold>
         {name}
       </Text>{' '}
-      <Text color={theme.text.secondary}>{description}</Text>
+      <Text color={theme.text.secondary} wrap="truncate">
+        {description}
+      </Text>
     </Text>
   </Box>
 );

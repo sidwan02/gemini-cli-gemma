@@ -36,11 +36,11 @@ export const GemmaAgent: AgentDefinition<typeof GemmaAgentOutputSchema> = {
       },
     },
   },
-  outputConfig: {
-    outputName: 'response',
-    description: "The Gemma agent's response as a string.",
-    schema: GemmaAgentOutputSchema,
-  },
+  // outputConfig: {
+  //   outputName: 'response',
+  //   description: "The Gemma agent's response as a string.",
+  //   schema: GemmaAgentOutputSchema,
+  // },
 
   // The 'output' parameter is now strongly typed as GemmaAgentOutputSchema
   processOutput: (output: z.infer<typeof GemmaAgentOutputSchema>) => {
@@ -77,11 +77,7 @@ Your **SOLE PURPOSE** is to make a series of tool calls to gather information fo
 You operate in a non-interactive loop and must reason based on the information provided and the output of your tools to make more successive tool calls.
 ---
 ## Available Tools
-You have access to functions. If you decide to invoke any of the function(s), you MUST put it in the format of:
-\`\`\`json
-{"name": "tool_call_name", "parameters": { ... }}
-\`\`\`
-
+You have access to these tools:
 \${tool_code}
 ---
 ## Core Directives
@@ -91,21 +87,23 @@ You have access to functions. If you decide to invoke any of the function(s), yo
 3.  **NO GUESSING:** If you don't have enough information, you MUST use tool calls to gather more information. Do not make assumptions or guess.
 4.  **EFFECTIVE WILDCARD USAGE:** Minimize the number of tool calls you make. When using the \`glob\` or \`grep\` tools, use effective wildcard patterns to capture multiple relevant files or lines in a single call.
 5.  **CAREFUL SPELLING:** Use careful spelling and casing for all tool names and parameters. Be especially careful of unnecessary whitespaces.
-6.  **NO REPETITION:** Do not repeat the same tool calls or text in your responses.
+6.  **NO REPETITION & NO LOOPS**: You MUST NOT repeat the exact same tool call (function name and parameters) in successive turns. Avoid infinite loops. If you've previously gathered sufficient information from a file, do not call read_file on that path again unless the primary objective has changed or new context requires it.
 </RULES>
 ---
 ## Termination
-When you are finished, and you are very confident in your answer based on the results from your tool calls, you **MUST** respond to the user's objective. Your final response should be plain text, not a JSON object or tool call.
+When you have your answer from the results of previous tool calls, you **MUST** respond to the user's objective and then call \`complete_task\`.
 
-**Example tool call**
+**Example tool call (when you need more information)**
 I need to...
 \`\`\`json
 {"name": "tool_call_name", "parameters": { ... }}
 \`\`\`
 
-**Example final response**
-I am ready to provide the final response because (very brief rationale)...
-Response goes here..." 
+**Example final response (this MUST have your response followed by the \`complete_task\` tool call)**
+Response goes here..."
+\`\`\`json
+{"name": "complete_task"}
+\`\`\`
 `,
   },
 };

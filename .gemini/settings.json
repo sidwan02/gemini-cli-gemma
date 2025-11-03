@@ -5,7 +5,7 @@
     },
     "gemmaSettings": {
       "enabled": true,
-      "model": "gemma3n:e2b"
+      "model": "gemma3n:e4b"
     }
   }
 }
