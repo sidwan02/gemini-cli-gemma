@@ -536,35 +536,28 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let functionCalls = this._parseOllamaToolCalls(textResponse, promptId);
 
-    // Fallback for models that return a raw JSON for the final answer,
-    // instead of using the `complete_task` tool format.
-    if (functionCalls.length === 0 && textResponse.trim().startsWith('{')) {
-      const completeTaskDeclaration = tools.find(
-        (tool) => tool.name === TASK_COMPLETE_TOOL_NAME,
+    // If there is no function call, it implies complete_task call.
+    if (functionCalls.length === 0) {
+      debugLogger.log(
+        '[Debug] No function calls parsed from Ollama response, complete_task fallback.',
       );
-
-      if (completeTaskDeclaration) {
-        const outputName = this.definition.outputConfig?.outputName;
-        if (outputName) {
-          let args = {};
-          try {
-            const strippedText = stripJsonMarkdown(textResponse);
-            args = { [outputName]: JSON.parse(strippedText) };
-            const completeTaskFunctionCall: FunctionCall = {
-              name: completeTaskDeclaration.name,
-              args,
-              id: 'ollama-complete-task-json-fallback',
-            };
-            functionCalls = [completeTaskFunctionCall];
-          } catch (error) {
-            debugLogger.log(
-              `[Debug] Fallback JSON parsing for complete_task failed: ${error}`,
-            );
-            // If parsing fails, pass the raw string. The validator in
-            // `processFunctionCalls` will then fail with a clear error.
-            args = { [outputName]: textResponse };
-          }
+      const outputName = this.definition.outputConfig?.outputName;
+      if (outputName) {
+        let args = {};
+        try {
+          // const strippedText = stripJsonMarkdown(textResponse);
+          args = { [outputName]: JSON.parse(textResponse) };
+          debugLogger.log(`[Debug] Subagent response is json.`);
+        } catch (error) {
+          args = { [outputName]: textResponse };
+          debugLogger.log(`[Debug] Subagent response is text.`);
         }
+        const completeTaskFunctionCall: FunctionCall = {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args,
+          id: 'ollama-complete-task-fallback',
+        };
+        functionCalls = [completeTaskFunctionCall];
       }
     }
     return { functionCalls, textResponse };
@@ -914,7 +907,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       );
     }
 
-    // Always inject complete_task.
+    // Always inject complete_task if want gemma subagent to response in json format.
     // Configure its schema based on whether output is expected.
     const completeTool: FunctionDeclaration = {
       name: TASK_COMPLETE_TOOL_NAME,
@@ -940,7 +933,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       completeTool.parameters!.required!.push(outputConfig.outputName);
     }
 
-    toolsList.push(completeTool);
+    // Gemma subagent will response in fully formatted text instead of json.
+    // toolsList.push(completeTool);
 
     return toolsList;
   }
@@ -974,10 +968,12 @@ Important Rules:
 * Work systematically using available tools to complete your task.
 * Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
 
-    finalPrompt += `
-* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
-* Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
-* This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
+    if (!('host' in this.definition.modelConfig)) {
+      finalPrompt += `
+    * When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
+    * Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
+    * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
+    }
 
     return finalPrompt;
   }

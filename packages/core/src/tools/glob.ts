@@ -277,7 +277,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
           },
           path: {
             description:
-              "Optional: The absolute path to the directory to search within. Defaults to '.'.",
+              'Optional: The absolute path to the directory to search within. Defaults to the current working directory (root).',
             type: 'string',
           },
           case_sensitive: {
