@@ -272,12 +272,12 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
         properties: {
           pattern: {
             description:
-              "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
+              "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md', '**/*search*').",
             type: 'string',
           },
           path: {
             description:
-              'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
+              "Optional: The absolute path to the directory to search within. Defaults to '.'.",
             type: 'string',
           },
           case_sensitive: {

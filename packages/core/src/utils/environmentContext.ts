@@ -31,10 +31,10 @@ export async function getDirectoryContextString(
 
   let workingDirPreamble: string;
   if (workspaceDirectories.length === 1) {
-    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
+    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}. I have access to this directory and its subdirectories.`;
   } else {
     const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
+    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}. I have access to these directories and their subdirectories.`;
   }
 
   return workingDirPreamble + '\n';
