@@ -1,3 +1,40 @@
+user -----
+This is the Gemini CLI. We are setting up the context for our chat.
+Today's date is Thursday, November 6, 2025 (formatted according to the user's locale).
+My operating system is: darwin
+I'm currently working in the directory: /Users/siddharthdiwan/Desktop/gemini-cli-gemma. I have access to this directory and its subdirectories.
+
+Reminder: Do not return an empty response when a tool call is required.
+
+My setup is complete. I will provide my first command in the next turn.
+user -----
+Here is the user's editor context as a JSON object. This is for your information only.
+```json
+{
+  "activeFile": {
+    "path": "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/.gemini/settings.json",
+    "cursor": {
+      "line": 16,
+      "character": 28
+    }
+  },
+  "otherOpenFiles": [
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/core/ollamaClient.ts",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/routing/strategies/classifierStrategy.ts",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/agents/gemma.ts",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/.env",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli/src/config/config.test.ts",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/telemetry/clearcut-logger/clearcut-logger.test.ts",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/config/config.test.ts",
+    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli/src/config/settingsSchema.ts"
+  ]
+}
+```
+user -----
+hi
+assistant -----
+Hello! How can I help you today?
+user -----
 
 You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between `flash` (SIMPLE) or `pro` (COMPLEX).
 1.  `flash`: A fast, efficient model for simple, well-defined tasks.
@@ -72,3 +109,10 @@ When making your decision, the user's request should be weighted much more heavi
   "reasoning": "Although the user uses strategic language ('best way'), the underlying task is a localized edit. The operational complexity is low (1-2 steps).",
   "model_choice": "flash"
 }
+
+Remember! The JSON output MUST contain the fields "reasoning" and "model_choice" as specified in the schema above.
+
+User request:
+
+
+make a full plan on how to investigate this codebase

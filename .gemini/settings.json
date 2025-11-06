@@ -9,9 +9,13 @@
     },
     "useModelRouter": {
       "useGemmaRouting": {
-        "enabled": true,
+        "enabled": false,
         "host": "http://localhost:11434",
-        "model": "gemma3n:e2b"
+        // "model": "gemma3n:e4b"
+        // "model": "gemma3n:e2b"
+        "model": "gemma3:1b"
+        // "model": "gemma3:270m"
+
       }
     }
   }

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs/promises';
 import { OllamaClient } from '../../core/ollamaClient.js';
 import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
@@ -125,20 +124,11 @@ When making your decision, the user's request should be weighted much more heavi
   "reasoning": "Although the user uses strategic language ('best way'), the underlying task is a localized edit. The operational complexity is low (1-2 steps).",
   "model_choice": "${FLASH_MODEL}"
 }
-`;
 
-// Save the CLASSIFIER_SYSTEM_PROMPT to a file for debugging.
-(async () => {
-  try {
-    await fs.writeFile('router.txt', CLASSIFIER_SYSTEM_PROMPT);
-    debugLogger.log('[DEBUG] Router Prompt saved to router.txt');
-  } catch (error) {
-    debugLogger.error(
-      '[DEBUG] Failed to save router prompt to router.txt:',
-      error,
-    );
-  }
-})();
+Remember! The JSON output MUST contain the fields "reasoning" and "model_choice" as specified in the schema above.
+
+User request:
+`;
 
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -239,12 +229,12 @@ export class ClassifierStrategy implements RoutingStrategy {
       }
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
+      const latencyMs = Date.now() - startTime;
       debugLogger.log(
-        `[Routing] ClassifierStrategy selected model: ${routerResponse.model_choice} based on reasoning: ${routerResponse.reasoning}`,
+        `[Routing] ClassifierStrategy selected model: ${routerResponse.model_choice} based on reasoning: ${routerResponse.reasoning}. Classification took ${latencyMs}ms.`,
       );
 
       const reasoning = routerResponse.reasoning;
-      const latencyMs = Date.now() - startTime;
 
       if (routerResponse.model_choice === FLASH_MODEL) {
         return {

@@ -8,6 +8,7 @@ import { Ollama } from 'ollama';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from './ollamaChat.js';
+import * as fs from 'node:fs/promises';
 
 /**
  * A client for making single, non-streaming calls to an Ollama-compatible API
@@ -49,11 +50,39 @@ export class OllamaClient {
   ): Promise<object> {
     const messages = contents.map(this.toOllamaMessage);
     if (systemInstruction) {
-      messages.unshift({
-        role: 'system',
-        content: systemInstruction,
-      });
+      // messages.unshift({
+      //   role: 'system',
+      //   content: systemInstruction,
+      // });
+
+      // Gemma forgets the system instruction if there's too much content.
+      // Prepend the system instruction to the user query.
+      if (messages.length > 1) {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage) {
+          lastMessage.content =
+            systemInstruction + '\n\n' + lastMessage.content;
+        }
+      }
     }
+
+    let fileContent = '';
+    for (const message of messages) {
+      fileContent += `${message.role} -----\n${message.content}\n`;
+    }
+
+    // Save the router prompt to a file for debugging.
+    (async () => {
+      try {
+        await fs.writeFile('router.txt', fileContent);
+        debugLogger.log('[DEBUG] Router Prompt saved to router.txt');
+      } catch (error) {
+        debugLogger.error(
+          '[DEBUG] Failed to save router prompt to router.txt:',
+          error,
+        );
+      }
+    })();
 
     debugLogger.log(`[OllamaClient] Sending request to model: ${this.model}`);
 
