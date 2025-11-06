@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
+import { OllamaClient } from '../../core/ollamaClient.js';
 import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
@@ -21,6 +23,7 @@ import {
   type GenerateContentConfig,
   createUserContent,
   Type,
+  type Content as GeminiContent,
 } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -28,6 +31,10 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type {
+  Content as OllamaContent,
+  Part as OllamaPart,
+} from '../../core/ollamaChat.js';
 
 const CLASSIFIER_GENERATION_CONFIG: GenerateContentConfig = {
   temperature: 0,
@@ -118,6 +125,19 @@ Respond *only* in JSON format according to the following schema. Do not include 
 }
 `;
 
+// Save the CLASSIFIER_SYSTEM_PROMPT to a file for debugging.
+(async () => {
+  try {
+    await fs.writeFile('router.txt', CLASSIFIER_SYSTEM_PROMPT);
+    debugLogger.log('[DEBUG] Router Prompt saved to router.txt');
+  } catch (error) {
+    debugLogger.error(
+      '[DEBUG] Failed to save router prompt to router.txt:',
+      error,
+    );
+  }
+})();
+
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -139,12 +159,24 @@ const ClassifierResponseSchema = z.object({
   model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
 });
 
+function toOllamaContent(geminiContent: GeminiContent): OllamaContent | null {
+  if (geminiContent.role !== 'user' && geminiContent.role !== 'model') {
+    return null;
+  }
+  return {
+    role: geminiContent.role,
+    parts: (geminiContent.parts ?? [])
+      .map((part) => ('text' in part ? { text: part.text } : null))
+      .filter((part): part is OllamaPart => part !== null),
+  };
+}
+
 export class ClassifierStrategy implements RoutingStrategy {
   readonly name = 'classifier';
 
   async route(
     context: RoutingContext,
-    _config: Config,
+    config: Config,
     baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
@@ -172,15 +204,37 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       debugLogger.log(`[Routing] About to call classifier.`);
 
-      const jsonResponse = await baseLlmClient.generateJson({
-        contents: [...finalHistory, createUserContent(context.request)],
-        schema: RESPONSE_SCHEMA,
-        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        config: CLASSIFIER_GENERATION_CONFIG,
-        abortSignal: context.signal,
-        promptId,
-      });
+      let jsonResponse;
+      if (config.getUseGemmaRoutingSettings()?.enabled) {
+        debugLogger.log(`[Routing] Using OllamaClient for classifier routing.`);
+        const ollamaClient = new OllamaClient(config);
+        const ollamaHistory = finalHistory
+          .map(toOllamaContent)
+          .filter((c): c is OllamaContent => c !== null);
+        const ollamaRequest = toOllamaContent(
+          createUserContent(context.request),
+        );
+        if (ollamaRequest) {
+          ollamaHistory.push(ollamaRequest);
+        }
+
+        debugLogger.log(`[Routing] ollamaHistory:`, ollamaHistory);
+
+        jsonResponse = await ollamaClient.generateJson(
+          ollamaHistory,
+          CLASSIFIER_SYSTEM_PROMPT,
+        );
+      } else {
+        jsonResponse = await baseLlmClient.generateJson({
+          contents: [...finalHistory, createUserContent(context.request)],
+          schema: RESPONSE_SCHEMA,
+          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+          systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
+          config: CLASSIFIER_GENERATION_CONFIG,
+          abortSignal: context.signal,
+          promptId,
+        });
+      }
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       debugLogger.log(

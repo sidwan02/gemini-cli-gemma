@@ -583,7 +583,7 @@ describe('Server Config (config.ts)', () => {
     it('should set useModelRouter to true when provided as true', () => {
       const paramsWithModelRouter: ConfigParameters = {
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
       };
       const config = new Config(paramsWithModelRouter);
       expect(config.getUseModelRouter()).toBe(true);
@@ -592,7 +592,7 @@ describe('Server Config (config.ts)', () => {
     it('should set useModelRouter to false when explicitly provided as false', () => {
       const paramsWithModelRouter: ConfigParameters = {
         ...baseParams,
-        useModelRouter: false,
+        useModelRouter: { enabled: false },
       };
       const config = new Config(paramsWithModelRouter);
       expect(config.getUseModelRouter()).toBe(false);

@@ -1076,14 +1076,55 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
       },
       useModelRouter: {
-        type: 'boolean',
+        type: 'object',
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: {},
         description:
           'Enable model routing to route requests to the best model based on complexity.',
-        showInDialog: true,
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Model Router',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Enable model routing to route requests to the best model based on complexity.',
+            showInDialog: true,
+          },
+          useGemmaRouting: {
+            type: 'object',
+            label: 'Use Gemma Routing',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Enable Gemma routing.',
+            showInDialog: false,
+            properties: {
+              enabled: {
+                type: 'boolean',
+                label: 'Enable Gemma',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: false,
+                description: 'Enable the Gemma agent.',
+                showInDialog: true,
+              },
+              model: {
+                type: 'string',
+                label: 'Model',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'gemma3n:e2b',
+                description: 'The model to use for the Gemma agent.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
       },
       codebaseInvestigatorSettings: {
         type: 'object',
@@ -1145,9 +1186,9 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      gemmaSettings: {
+      gemmaSubagentSettings: {
         type: 'object',
-        label: 'Gemma Settings',
+        label: 'Gemma Subagent Settings',
         category: 'Experimental',
         requiresRestart: true,
         default: {},
