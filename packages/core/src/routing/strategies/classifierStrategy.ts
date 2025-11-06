@@ -79,6 +79,8 @@ Respond *only* in JSON format according to the following schema. Do not include 
   },
   "required": ["reasoning", "model_choice"]
 }
+You must ensure that your reasoning is no more than 2 sentences long and directly references the rubric criteria.
+When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.
 --- EXAMPLES ---
 **Example 1 (Strategic Planning):**
 *User Prompt:* "How should I architect the data pipeline for this new analytics service?"
@@ -218,7 +220,7 @@ export class ClassifierStrategy implements RoutingStrategy {
           ollamaHistory.push(ollamaRequest);
         }
 
-        debugLogger.log(`[Routing] ollamaHistory:`, ollamaHistory);
+        // debugLogger.log(`[Routing] ollamaHistory:`, ollamaHistory);
 
         jsonResponse = await ollamaClient.generateJson(
           ollamaHistory,
