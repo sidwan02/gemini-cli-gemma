@@ -11,6 +11,7 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfig } from '../agents/types.js';
+import { BuildAndTestAgent } from './build-test-agent.js';
 
 /**
  * Manages the discovery, loading, validation, and registration of
@@ -38,6 +39,7 @@ export class AgentRegistry {
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const gemmaSettings = this.config.getGemmaSettings();
+    const buildAndTestSettings = this.config.getBuildAndTestSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -77,6 +79,18 @@ export class AgentRegistry {
         },
       };
       this.registerAgent(gemmaAgentDef);
+    }
+
+    if (buildAndTestSettings?.enabled) {
+      const buildAndTestAgentDef = {
+        ...BuildAndTestAgent,
+        modelConfig: {
+          ...BuildAndTestAgent.modelConfig,
+          model:
+            buildAndTestSettings.model ?? BuildAndTestAgent.modelConfig.model,
+        },
+      };
+      this.registerAgent(buildAndTestAgentDef);
     }
   }
 

@@ -6,6 +6,13 @@
     "gemmaSettings": {
       "enabled": true,
       "model": "gemma3n:e4b"
+    },
+    "buildAndTestSettings": {
+      "enabled": true,
+      "model": "gemma3:12b"
     }
+  },
+  "model": {
+    "summarizeToolOutput": {"run_shell_command": {"token_budget": 5000}}
   }
 }

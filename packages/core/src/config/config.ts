@@ -131,6 +131,12 @@ export interface GemmaSettings {
   host?: string;
 }
 
+export interface BuildAndTestSettings {
+  enabled?: boolean;
+  model?: string;
+  host?: string;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -287,6 +293,7 @@ export interface ConfigParameters {
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   gemmaSettings?: GemmaSettings;
+  buildAndTestSettings?: BuildAndTestSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -387,6 +394,7 @@ export class Config {
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly gemmaSettings: GemmaSettings;
+  private readonly buildAndTestSettings: BuildAndTestSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -498,6 +506,11 @@ export class Config {
     this.gemmaSettings = {
       enabled: params.gemmaSettings?.enabled ?? false,
       model: params.gemmaSettings?.model ?? 'gemma3n:e2b',
+      host: params.gemmaSettings?.host ?? 'http://localhost:11434',
+    };
+    this.buildAndTestSettings = {
+      enabled: params.buildAndTestSettings?.enabled ?? false,
+      model: params.buildAndTestSettings?.model ?? 'gemma3n:e4b',
       host: params.gemmaSettings?.host ?? 'http://localhost:11434',
     };
     // debugLogger.log(
@@ -1117,6 +1130,10 @@ export class Config {
     return this.gemmaSettings;
   }
 
+  getBuildAndTestSettings(): BuildAndTestSettings {
+    return this.buildAndTestSettings;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.eventEmitter);
 
@@ -1235,6 +1252,30 @@ export class Config {
     }
     if (this.getGemmaSettings().enabled) {
       const definition = this.agentRegistry.getDefinition('gemma_agent');
+      if (definition) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
+          const messageBusEnabled = this.getEnableMessageBusIntegration();
+          const wrapper = new SubagentToolWrapper(
+            definition,
+            this,
+            messageBusEnabled ? this.getMessageBus() : undefined,
+          );
+          registry.registerTool(wrapper);
+        }
+      }
+    }
+    if (this.getBuildAndTestSettings().enabled) {
+      const definition = this.agentRegistry.getDefinition(
+        'build_and_test_agent',
+      );
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
         const excludeTools = this.getExcludeTools() || [];

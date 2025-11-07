@@ -42,16 +42,6 @@ const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
   mockExecuteToolCall: vi.fn(),
 }));
 
-vi.mock('../core/geminiChat.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../core/geminiChat.js')>();
-  return {
-    ...actual,
-    GeminiChat: vi.fn().mockImplementation(() => ({
-      sendMessageStream: mockSendMessageStream,
-    })),
-  };
-});
-
 vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
   executeToolCall: mockExecuteToolCall,
 }));
@@ -190,11 +180,8 @@ describe('AgentExecutor', () => {
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
-    MockedGeminiChat.mockImplementation(
-      () =>
-        ({
-          sendMessageStream: mockSendMessageStream,
-        }) as unknown as GeminiChat,
+    vi.spyOn(GeminiChat.prototype, 'sendMessageStream').mockImplementation(
+      mockSendMessageStream,
     );
 
     vi.useFakeTimers();
