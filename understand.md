@@ -213,14 +213,17 @@ fully-fledged, first-class provider for the entire application.
 
 Using the codebase investigator: tell me how the ollama inference works.
 
-- Without env context:
-  - `answer the simple task with the gemma agent of what gemma.ts defines`
-  - `Use gemma agent: List all files related to ollama in the entire project. Then summarize ollamaChat.ts`
-  - `What functions does gemma.ts define? remember to use gemma agent`
-  - `Use gemma agent: List all files related to ollama in the entire project. which file is responsible for running streamed inference in the core dir? summarize just that file.`
+## GemmaSubagent
 
-- With env context:
-  `answer the simple task with the gemma agent: explain briefly the current coding workspace.`
+- `answer the simple task with the gemma agent of what gemma.ts defines`
+- `Use gemma agent: List all files related to ollama in the entire project. Then summarize ollamaChat.ts`
+- `What functions does gemma.ts define? remember to use gemma agent`
+- `Use gemma agent: List all files related to ollama in the entire project. which file is responsible for running streamed inference in the core dir? summarize just that file.`
+- `answer the simple task with the gemma agent: explain briefly the current coding workspace.`
+
+## BuildAndTest
+
+- `use the build and test tool: run npm test -- src/tools/glob.test.ts`
 
 # TODO:
 
@@ -237,6 +240,7 @@ Using the codebase investigator: tell me how the ollama inference works.
 6. When listing files related to a search term, unnecessarily uses
    list_directory and doesn’t know where the files are (can’t feed the entire
    environment either due to prompt forgetting)
+7. Gemma often forgets which files it's already looked at.
 
 # Litellm setup
 

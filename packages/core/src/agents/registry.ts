@@ -38,7 +38,6 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
-    const gemmaSettings = this.config.getGemmaSettings();
     const buildAndTestSettings = this.config.getBuildAndTestSettings();
     const gemmaSubagentSettings = this.config.getGemmaSubagentSettings();
 

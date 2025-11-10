@@ -301,7 +301,6 @@ export interface ConfigParameters {
   useModelRouter?: UseModelRouterSettings;
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  gemmaSettings?: GemmaSettings;
   buildAndTestSettings?: BuildAndTestSettings;
   gemmaSubagentSettings?: GemmaSubagentSettings;
   continueOnFailedApiCall?: boolean;
@@ -403,7 +402,6 @@ export class Config {
   private readonly useModelRouter: UseModelRouterSettings;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly gemmaSettings: GemmaSettings;
   private readonly buildAndTestSettings: BuildAndTestSettings;
   private readonly gemmaSubagentSettings: GemmaSubagentSettings;
   private readonly continueOnFailedApiCall: boolean;
@@ -531,7 +529,7 @@ export class Config {
     this.buildAndTestSettings = {
       enabled: params.buildAndTestSettings?.enabled ?? false,
       model: params.buildAndTestSettings?.model ?? 'gemma3n:e4b',
-      host: params.gemmaSettings?.host ?? 'http://localhost:11434',
+      host: params.buildAndTestSettings?.host ?? 'http://localhost:11434',
     };
     // debugLogger.log(
     //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,

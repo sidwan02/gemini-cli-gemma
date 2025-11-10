@@ -668,7 +668,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
-    gemmaSettings: settings.experimental?.gemmaSettings,
+
     buildAndTestSettings: settings.experimental?.buildAndTestSettings,
     gemmaSubagentSettings: settings.experimental?.gemmaSubagentSettings,
     fakeResponses: argv.fakeResponses,

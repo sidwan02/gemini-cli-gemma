@@ -9,7 +9,6 @@ import type { OllamaModelConfig } from '../agents/types.js';
 import type { Content as GeminiContent } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 // import { debugLogger } from '../utils/debugLogger.js';
-import * as fs from 'node:fs/promises';
 
 // #region Self-contained types
 // These types are defined locally to avoid any dependency on @google/genai.
@@ -128,8 +127,6 @@ export class OllamaChat {
     const messages = this.history.map(toOllamaMessage);
     // TODO: environment is still being forgotten in the middle of the system instruction.
     // debugLogger.log('[OllamaChat] system instruction:', this.systemInstruction);
-    await fs.writeFile('agent.txt', this.systemInstruction ?? '');
-    debugLogger.log('[DEBUG] System Instruction saved to agent.txt');
     if (this.systemInstruction) {
       messages.unshift({
         role: 'system',

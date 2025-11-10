@@ -52,6 +52,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Part as OllamaPart } from '../core/ollamaChat.js';
 import { extractValidJson } from '../utils/json.js';
+import * as fs from 'node:fs/promises';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -595,6 +596,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     const systemInstruction = promptConfig.systemPrompt
       ? await this.buildSystemPrompt(inputs)
       : undefined;
+
+    await fs.writeFile(
+      `${this.definition.name}_prompt.txt`,
+      systemInstruction ?? '',
+    );
+    debugLogger.log(
+      `[DEBUG] System Instruction saved to ${this.definition.name}_prompt.txt`,
+    );
 
     // debugLogger.log(
     //   `[AgentExecutor] Created system instruction: ${systemInstruction}`,
