@@ -131,6 +131,12 @@ export interface GemmaSubagentSettings {
   host?: string;
 }
 
+export interface BuildAndTestSettings {
+  enabled?: boolean;
+  model?: string;
+  host?: string;
+}
+
 export interface UseModelRouterSettings {
   enabled?: boolean;
   useGemmaRouting?: {
@@ -295,6 +301,8 @@ export interface ConfigParameters {
   useModelRouter?: UseModelRouterSettings;
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  gemmaSettings?: GemmaSettings;
+  buildAndTestSettings?: BuildAndTestSettings;
   gemmaSubagentSettings?: GemmaSubagentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -395,6 +403,8 @@ export class Config {
   private readonly useModelRouter: UseModelRouterSettings;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly gemmaSettings: GemmaSettings;
+  private readonly buildAndTestSettings: BuildAndTestSettings;
   private readonly gemmaSubagentSettings: GemmaSubagentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -517,6 +527,11 @@ export class Config {
       enabled: params.gemmaSubagentSettings?.enabled ?? false,
       model: params.gemmaSubagentSettings?.model ?? 'gemma3n:e2b',
       host: params.gemmaSubagentSettings?.host ?? 'http://localhost:11434',
+    };
+    this.buildAndTestSettings = {
+      enabled: params.buildAndTestSettings?.enabled ?? false,
+      model: params.buildAndTestSettings?.model ?? 'gemma3n:e4b',
+      host: params.gemmaSettings?.host ?? 'http://localhost:11434',
     };
     // debugLogger.log(
     //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,
@@ -1139,6 +1154,10 @@ export class Config {
     return this.gemmaSubagentSettings;
   }
 
+  getBuildAndTestSettings(): BuildAndTestSettings {
+    return this.buildAndTestSettings;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.eventEmitter);
 
@@ -1257,6 +1276,30 @@ export class Config {
     }
     if (this.getGemmaSubagentSettings().enabled) {
       const definition = this.agentRegistry.getDefinition('gemma_agent');
+      if (definition) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
+          const messageBusEnabled = this.getEnableMessageBusIntegration();
+          const wrapper = new SubagentToolWrapper(
+            definition,
+            this,
+            messageBusEnabled ? this.getMessageBus() : undefined,
+          );
+          registry.registerTool(wrapper);
+        }
+      }
+    }
+    if (this.getBuildAndTestSettings().enabled) {
+      const definition = this.agentRegistry.getDefinition(
+        'build_and_test_agent',
+      );
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
         const excludeTools = this.getExcludeTools() || [];

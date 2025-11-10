@@ -30,6 +30,7 @@ import {
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
+  SHELL_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -50,7 +51,7 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Part as OllamaPart } from '../core/ollamaChat.js';
-import { stripJsonMarkdown } from '../utils/json.js';
+import { extractValidJson } from '../utils/json.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -196,6 +197,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         const promptId = `${this.agentId}#${turnCounter++}`;
+
+        debugLogger.log('Prompt ID: ' + promptId);
 
         // The textResponse is not deconstructed from callModel, but it's used to emit/yield thoughts and streamed chunks to the UI.
         const { functionCalls, textResponse } = await promptIdContext.run(
@@ -367,7 +370,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     text: string,
     promptId: string,
   ): FunctionCall[] {
-    const strippedText = stripJsonMarkdown(text);
+    // const strippedText = stripJsonMarkdown(text);
+    const strippedText = extractValidJson(text);
     debugLogger.log(
       `[Debug] Parsing Ollama tool calls from text: ${strippedText}`,
     );
@@ -1022,6 +1026,7 @@ Important Rules:
       GLOB_TOOL_NAME,
       READ_MANY_FILES_TOOL_NAME,
       MEMORY_TOOL_NAME,
+      SHELL_TOOL_NAME,
       WEB_SEARCH_TOOL_NAME,
     ]);
     for (const tool of toolRegistry.getAllTools()) {
