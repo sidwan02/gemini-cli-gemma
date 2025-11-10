@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { OllamaClient } from '../../core/ollamaClient.js';
 import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
@@ -21,6 +22,7 @@ import {
   type GenerateContentConfig,
   createUserContent,
   Type,
+  type Content as GeminiContent,
 } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -28,6 +30,10 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type {
+  Content as OllamaContent,
+  Part as OllamaPart,
+} from '../../core/ollamaChat.js';
 
 const CLASSIFIER_GENERATION_CONFIG: GenerateContentConfig = {
   temperature: 0,
@@ -72,6 +78,8 @@ Respond *only* in JSON format according to the following schema. Do not include 
   },
   "required": ["reasoning", "model_choice"]
 }
+You must ensure that your reasoning is no more than 2 sentences long and directly references the rubric criteria.
+When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.
 --- EXAMPLES ---
 **Example 1 (Strategic Planning):**
 *User Prompt:* "How should I architect the data pipeline for this new analytics service?"
@@ -116,6 +124,10 @@ Respond *only* in JSON format according to the following schema. Do not include 
   "reasoning": "Although the user uses strategic language ('best way'), the underlying task is a localized edit. The operational complexity is low (1-2 steps).",
   "model_choice": "${FLASH_MODEL}"
 }
+
+Remember! The JSON output MUST contain the fields "reasoning" and "model_choice" as specified in the schema above.
+
+User request:
 `;
 
 const RESPONSE_SCHEMA = {
@@ -139,12 +151,24 @@ const ClassifierResponseSchema = z.object({
   model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
 });
 
+function toOllamaContent(geminiContent: GeminiContent): OllamaContent | null {
+  if (geminiContent.role !== 'user' && geminiContent.role !== 'model') {
+    return null;
+  }
+  return {
+    role: geminiContent.role,
+    parts: (geminiContent.parts ?? [])
+      .map((part) => ('text' in part ? { text: part.text } : null))
+      .filter((part): part is OllamaPart => part !== null),
+  };
+}
+
 export class ClassifierStrategy implements RoutingStrategy {
   readonly name = 'classifier';
 
   async route(
     context: RoutingContext,
-    _config: Config,
+    config: Config,
     baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
@@ -172,23 +196,45 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       debugLogger.log(`[Routing] About to call classifier.`);
 
-      const jsonResponse = await baseLlmClient.generateJson({
-        contents: [...finalHistory, createUserContent(context.request)],
-        schema: RESPONSE_SCHEMA,
-        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        config: CLASSIFIER_GENERATION_CONFIG,
-        abortSignal: context.signal,
-        promptId,
-      });
+      let jsonResponse;
+      if (config.getUseGemmaRoutingSettings()?.enabled) {
+        debugLogger.log(`[Routing] Using OllamaClient for classifier routing.`);
+        const ollamaClient = new OllamaClient(config);
+        const ollamaHistory = finalHistory
+          .map(toOllamaContent)
+          .filter((c): c is OllamaContent => c !== null);
+        const ollamaRequest = toOllamaContent(
+          createUserContent(context.request),
+        );
+        if (ollamaRequest) {
+          ollamaHistory.push(ollamaRequest);
+        }
+
+        // debugLogger.log(`[Routing] ollamaHistory:`, ollamaHistory);
+
+        jsonResponse = await ollamaClient.generateJson(
+          ollamaHistory,
+          CLASSIFIER_SYSTEM_PROMPT,
+        );
+      } else {
+        jsonResponse = await baseLlmClient.generateJson({
+          contents: [...finalHistory, createUserContent(context.request)],
+          schema: RESPONSE_SCHEMA,
+          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+          systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
+          config: CLASSIFIER_GENERATION_CONFIG,
+          abortSignal: context.signal,
+          promptId,
+        });
+      }
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
+      const latencyMs = Date.now() - startTime;
       debugLogger.log(
-        `[Routing] ClassifierStrategy selected model: ${routerResponse.model_choice} based on reasoning: ${routerResponse.reasoning}`,
+        `[Routing] ClassifierStrategy selected model: ${routerResponse.model_choice} based on reasoning: ${routerResponse.reasoning}. Classification took ${latencyMs}ms.`,
       );
 
       const reasoning = routerResponse.reasoning;
-      const latencyMs = Date.now() - startTime;
 
       if (routerResponse.model_choice === FLASH_MODEL) {
         return {

@@ -125,7 +125,7 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
-export interface GemmaSettings {
+export interface GemmaSubagentSettings {
   enabled?: boolean;
   model?: string;
   host?: string;
@@ -135,6 +135,15 @@ export interface BuildAndTestSettings {
   enabled?: boolean;
   model?: string;
   host?: string;
+}
+
+export interface UseModelRouterSettings {
+  enabled?: boolean;
+  useGemmaRouting?: {
+    enabled?: boolean;
+    model?: string;
+    host?: string;
+  };
 }
 
 /**
@@ -289,11 +298,12 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
-  useModelRouter?: boolean;
+  useModelRouter?: UseModelRouterSettings;
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   gemmaSettings?: GemmaSettings;
   buildAndTestSettings?: BuildAndTestSettings;
+  gemmaSubagentSettings?: GemmaSubagentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -390,11 +400,12 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly useModelRouter: boolean;
+  private readonly useModelRouter: UseModelRouterSettings;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly gemmaSettings: GemmaSettings;
   private readonly buildAndTestSettings: BuildAndTestSettings;
+  private readonly gemmaSubagentSettings: GemmaSubagentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -490,7 +501,16 @@ export class Config {
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? false;
-    this.useModelRouter = params.useModelRouter ?? false;
+    this.useModelRouter = {
+      enabled: params.useModelRouter?.enabled ?? false,
+      useGemmaRouting: {
+        enabled: params.useModelRouter?.useGemmaRouting?.enabled ?? false,
+        model: params.useModelRouter?.useGemmaRouting?.model ?? 'gemma3n:e2b',
+        host:
+          params.useModelRouter?.useGemmaRouting?.host ??
+          'http://localhost:11434',
+      },
+    };
     // debugLogger.log(`[DEBUG] useModelRouter: ${this.useModelRouter}`);
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
@@ -503,10 +523,10 @@ export class Config {
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
     };
-    this.gemmaSettings = {
-      enabled: params.gemmaSettings?.enabled ?? false,
-      model: params.gemmaSettings?.model ?? 'gemma3n:e2b',
-      host: params.gemmaSettings?.host ?? 'http://localhost:11434',
+    this.gemmaSubagentSettings = {
+      enabled: params.gemmaSubagentSettings?.enabled ?? false,
+      model: params.gemmaSubagentSettings?.model ?? 'gemma3n:e2b',
+      host: params.gemmaSubagentSettings?.host ?? 'http://localhost:11434',
     };
     this.buildAndTestSettings = {
       enabled: params.buildAndTestSettings?.enabled ?? false,
@@ -1095,7 +1115,7 @@ export class Config {
   }
 
   getUseModelRouter(): boolean {
-    return this.useModelRouter;
+    return this.useModelRouter.enabled ?? false;
   }
 
   async getGitService(): Promise<GitService> {
@@ -1122,12 +1142,16 @@ export class Config {
     return this.enableMessageBusIntegration;
   }
 
+  getUseGemmaRoutingSettings(): UseModelRouterSettings['useGemmaRouting'] {
+    return this.useModelRouter.useGemmaRouting;
+  }
+
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
   }
 
-  getGemmaSettings(): GemmaSettings {
-    return this.gemmaSettings;
+  getGemmaSubagentSettings(): GemmaSubagentSettings {
+    return this.gemmaSubagentSettings;
   }
 
   getBuildAndTestSettings(): BuildAndTestSettings {
@@ -1250,7 +1274,7 @@ export class Config {
         }
       }
     }
-    if (this.getGemmaSettings().enabled) {
+    if (this.getGemmaSubagentSettings().enabled) {
       const definition = this.agentRegistry.getDefinition('gemma_agent');
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.

@@ -1413,7 +1413,7 @@ describe('loadCliConfig model selection with model router', () => {
     const config = await loadCliConfig(
       {
         experimental: {
-          useModelRouter: true,
+          useModelRouter: { enabled: true },
         },
       },
       [],
@@ -1430,7 +1430,7 @@ describe('loadCliConfig model selection with model router', () => {
     const config = await loadCliConfig(
       {
         experimental: {
-          useModelRouter: false,
+          useModelRouter: { enabled: false },
         },
       },
       [],
@@ -1447,7 +1447,7 @@ describe('loadCliConfig model selection with model router', () => {
     const config = await loadCliConfig(
       {
         experimental: {
-          useModelRouter: true,
+          useModelRouter: { enabled: true },
         },
       },
       [],
@@ -1464,7 +1464,7 @@ describe('loadCliConfig model selection with model router', () => {
     const config = await loadCliConfig(
       {
         experimental: {
-          useModelRouter: true,
+          useModelRouter: { enabled: true },
         },
         model: {
           name: 'gemini-from-settings',
@@ -1485,7 +1485,7 @@ describe('loadCliConfig model selection with model router', () => {
     const config = await loadCliConfig(
       {
         experimental: {
-          useModelRouter: true,
+          useModelRouter: { enabled: true },
         },
       },
       [],
@@ -1694,7 +1694,9 @@ describe('loadCliConfig useRipgrep', () => {
     it('should be true when useModelRouter is set to true in settings', async () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { useModelRouter: true } };
+      const settings: Settings = {
+        experimental: { useModelRouter: { enabled: true } },
+      };
       const config = await loadCliConfig(settings, [], 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(true);
     });
@@ -1702,7 +1704,9 @@ describe('loadCliConfig useRipgrep', () => {
     it('should be false when useModelRouter is explicitly set to false in settings', async () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { useModelRouter: false } };
+      const settings: Settings = {
+        experimental: { useModelRouter: { enabled: false } },
+      };
       const config = await loadCliConfig(settings, [], 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(false);
     });

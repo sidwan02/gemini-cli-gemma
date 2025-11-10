@@ -3,13 +3,23 @@
     "codebaseInvestigatorSettings": {
       "enabled": false
     },
-    "gemmaSettings": {
+    "gemmaSubagentSettings": {
       "enabled": true,
       "model": "gemma3n:e4b"
     },
     "buildAndTestSettings": {
       "enabled": true,
       "model": "gemma3:12b"
+    },
+    "useModelRouter": {
+      "useGemmaRouting": {
+        "enabled": false,
+        "host": "http://localhost:11434",
+        // "model": "gemma3n:e4b"
+        // "model": "gemma3n:e2b"
+        "model": "gemma3:1b"
+        // "model": "gemma3:270m"
+      }
     }
   },
   "model": {

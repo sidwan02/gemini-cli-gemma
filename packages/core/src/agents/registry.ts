@@ -40,6 +40,7 @@ export class AgentRegistry {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const gemmaSettings = this.config.getGemmaSettings();
     const buildAndTestSettings = this.config.getBuildAndTestSettings();
+    const gemmaSubagentSettings = this.config.getGemmaSubagentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -70,12 +71,12 @@ export class AgentRegistry {
       this.registerAgent(agentDef);
     }
 
-    if (gemmaSettings?.enabled) {
+    if (gemmaSubagentSettings?.enabled) {
       const gemmaAgentDef = {
         ...GemmaAgent,
         modelConfig: {
           ...GemmaAgent.modelConfig,
-          model: gemmaSettings.model ?? GemmaAgent.modelConfig.model,
+          model: gemmaSubagentSettings.model ?? GemmaAgent.modelConfig.model,
         },
       };
       this.registerAgent(gemmaAgentDef);
