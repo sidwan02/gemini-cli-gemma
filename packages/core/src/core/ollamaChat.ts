@@ -71,14 +71,17 @@ export class OllamaChat {
   private history: Content[] = [];
   private readonly ollama: Ollama;
   private readonly systemInstruction?: string;
+  private readonly directive?: string;
 
   constructor(
     private readonly modelConfig: OllamaModelConfig,
     systemInstruction?: string,
     history?: GeminiContent[],
+    directive?: string,
   ) {
     this.ollama = new Ollama({ host: modelConfig.host });
     this.systemInstruction = systemInstruction;
+    this.directive = directive;
     if (history) {
       this.history = history
         .filter(
@@ -122,13 +125,27 @@ export class OllamaChat {
       parts: userParts,
     };
 
+    const currentHistory = [...this.history, userContent];
+
+    // Create a temporary message list for this turn, optionally appending the directive.
+    let messagesForApi = currentHistory.map(toOllamaMessage);
+    if (this.directive) {
+      // Deep copy to avoid mutating the original history content.
+      messagesForApi = JSON.parse(JSON.stringify(messagesForApi));
+      const lastMessage = messagesForApi[messagesForApi.length - 1];
+      // Gemma forgets the system instruction if there's too much content.
+      // Add the directive instruction to the user query or latest tool
+      // response.
+      if (lastMessage.role === 'user' && lastMessage.content) {
+        lastMessage.content += `\n\n${this.directive}`;
+      }
+    }
+
     this.history.push(userContent);
 
-    const messages = this.history.map(toOllamaMessage);
-    // TODO: environment is still being forgotten in the middle of the system instruction.
-    // debugLogger.log('[OllamaChat] system instruction:', this.systemInstruction);
+    // Prepend system instruction if it exists.
     if (this.systemInstruction) {
-      messages.unshift({
+      messagesForApi.unshift({
         role: 'system',
         content: this.systemInstruction,
       });
@@ -139,7 +156,7 @@ export class OllamaChat {
     return (async function* () {
       const stream = await self.ollama.chat({
         model: self.modelConfig.model,
-        messages,
+        messages: messagesForApi,
         stream: true,
         options: {
           temperature: self.modelConfig.temp,

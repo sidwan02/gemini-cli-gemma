@@ -615,6 +615,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         modelConfig as OllamaModelConfig,
         systemInstruction,
         startHistory,
+        promptConfig.directive,
       );
     } else {
       try {
@@ -967,6 +968,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const templateInputs: Record<string, unknown> = { ...inputs };
+
+    if (promptConfig.directive) {
+      templateInputs['directive'] = promptConfig.directive;
+    }
 
     if (promptConfig.systemPrompt.includes('${tool_code}')) {
       const tools = this.prepareToolsList();

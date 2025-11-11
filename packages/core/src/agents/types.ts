@@ -86,6 +86,11 @@ export interface PromptConfig {
   initialMessages?: Content[];
 
   /**
+   * If the directive is provided here, it will be prepended to the last user prompt in every turn of the subaent's execution. This is needed since Gemma models often forget the system instruction when lots of context is provided in user responses.
+   */
+  directive?: string;
+
+  /**
    * The specific task or question to trigger the agent's execution loop.
    * This is sent as the first user message, distinct from the systemPrompt (identity/rules)
    * and initialMessages (history/few-shots). Supports templating.
