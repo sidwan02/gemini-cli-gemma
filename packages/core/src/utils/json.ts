@@ -11,17 +11,42 @@
  * @returns The stripped text.
  */
 export function stripJsonMarkdown(text: string): string {
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
+  let cleanedText = text.trim();
 
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    let jsonText = text.substring(firstBrace, lastBrace + 1);
-    // Remove the vertical bar character and newlines that might be present in the output.
-    jsonText = jsonText.replace(/│/g, '').replace(/\n/g, '');
+  // Attempt to remove markdown code block fences if the entire string is a fenced block.
+  // This handles cases like:
+  // ```json
+  // { "key": "value" }
+  // ```
+  // or
+  // ```
+  // { "key": "value" }
+  // ```
+  const markdownFenceRegex = /^```(json)?\s*([\s\S]*?)\s*```$/;
+  const match = cleanedText.match(markdownFenceRegex);
+
+  if (match && match[2] !== undefined) {
+    // If it's a fenced block, use the content inside the fences.
+    cleanedText = match[2].trim();
+  }
+
+  // Use a regex to find the outermost JSON object.
+  // This is more robust than indexOf/lastIndexOf for cases with leading/trailing noise,
+  // and explicitly handles newlines within the JSON content.
+  const jsonRegex = /\{[\s\S]*\}/;
+  const jsonMatch = cleanedText.match(jsonRegex);
+
+  if (jsonMatch && jsonMatch[0] !== undefined) {
+    let jsonText = jsonMatch[0].trim();
+    // Remove the vertical bar character, which might be present as noise.
+    jsonText = jsonText.replace(/│/g, '');
+    // Newlines within the JSON content are preserved by the regex and handled by JSON.parse.
     return jsonText;
   }
 
-  return text;
+  // If no valid JSON object (braces) is found, return the original cleaned text.
+  // This might mean the input was not JSON, or was only markdown fences without content.
+  return cleanedText;
 }
 
 /**

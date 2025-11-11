@@ -51,7 +51,8 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Part as OllamaPart } from '../core/ollamaChat.js';
-import { extractValidJson } from '../utils/json.js';
+// import { extractValidJson } from '../utils/json.js';
+import { stripJsonMarkdown } from '../utils/json.js';
 import * as fs from 'node:fs/promises';
 
 /** A callback function to report on agent activity. */
@@ -371,8 +372,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     text: string,
     promptId: string,
   ): FunctionCall[] {
-    // const strippedText = stripJsonMarkdown(text);
-    const strippedText = extractValidJson(text);
+    const strippedText = stripJsonMarkdown(text);
+    // const strippedText = extractValidJson(text);
     debugLogger.log(
       `[Debug] Parsing Ollama tool calls from text: ${strippedText}`,
     );

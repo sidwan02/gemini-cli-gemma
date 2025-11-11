@@ -25,7 +25,7 @@ import {
 } from './tools.js';
 import { ApprovalMode } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { summarizeToolOutput } from '../utils/summarizer.js';
+// import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
   ShellExecutionConfig,
   ShellOutputEvent,
@@ -290,7 +290,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+      // const summarizeConfig = this.config.getSummarizeToolOutputConfig();
       const executionError = result.error
         ? {
             error: {
@@ -299,19 +299,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
             },
           }
         : {};
-      if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
-        const summary = await summarizeToolOutput(
-          llmContent,
-          this.config.getGeminiClient(),
-          signal,
-          summarizeConfig[SHELL_TOOL_NAME].tokenBudget,
-        );
-        return {
-          llmContent: summary,
-          returnDisplay: returnDisplayMessage,
-          ...executionError,
-        };
-      }
+      // if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
+      //   const summary = await summarizeToolOutput(
+      //     llmContent,
+      //     this.config.getGeminiClient(),
+      //     signal,
+      //     summarizeConfig[SHELL_TOOL_NAME].tokenBudget,
+      //   );
+      //   return {
+      //     llmContent: summary,
+      //     returnDisplay: returnDisplayMessage,
+      //     ...executionError,
+      //   };
+      // }
 
       return {
         llmContent,
