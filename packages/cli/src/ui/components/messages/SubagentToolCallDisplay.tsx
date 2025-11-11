@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
+// import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { TOOL_STATUS } from '../../constants.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
@@ -25,6 +25,7 @@ type SubagentToolCallDisplayProps = {
 
 export const SubagentToolCallDisplay: React.FC<
   SubagentToolCallDisplayProps
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
 > = ({ toolCall, toolResponse, terminalWidth }) => {
   const status = toolResponse
     ? toolResponse.data.isError
@@ -35,7 +36,7 @@ export const SubagentToolCallDisplay: React.FC<
   // The width passed is the total available width.
   // The Box component's width is for the content area, so we must subtract
   // space for padding and borders to make the whole component fit.
-  const innerContentWidth = terminalWidth - 4 - STATUS_INDICATOR_WIDTH;
+  // const innerContentWidth = terminalWidth - 4 - STATUS_INDICATOR_WIDTH;
 
   return (
     <Box
@@ -54,11 +55,17 @@ export const SubagentToolCallDisplay: React.FC<
       </Box>
       {toolResponse && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
-          <MarkdownDisplay
-            text={String(toolResponse.data.output ?? 'No output')}
-            isPending={false}
-            terminalWidth={innerContentWidth}
-          />
+          <Box flexDirection="column">
+            {String(toolResponse.data.output ?? 'No output')
+              .split('\n')
+              .map((line, index) => (
+                <Box key={index}>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {line}
+                  </Text>
+                </Box>
+              ))}
+          </Box>
         </Box>
       )}
     </Box>

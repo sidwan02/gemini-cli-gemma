@@ -40,8 +40,10 @@ import {
   isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
+
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -214,6 +216,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+
+      // result.output =
+      //   '@google/gemini-cli@0.12.0-nightly.20251022.0542de95 test\nnpm run test --workspaces --if-present --parallel src/tools/glob.test.ts\n@google\ngemini-cli-a2a-server@0.12.0-nightly.20251022.0542de95 test\nvitest run src/tools/glob.test.ts\nnpm error command failed\nnpm error command sh -c vitest run src/tools/glob.test.ts\n@google/gemini-cli@0.12.0-nightly.20251022.0542de95 test';
+      debugLogger.log(`[Debug] ShellToolInvocation result: ${result.output}`);
+      debugLogger.log(
+        `[Debug] ShellToolInvocation stripped output: ${result.output}`,
+      );
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
