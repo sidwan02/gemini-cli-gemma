@@ -7,8 +7,8 @@
 import type { AgentDefinition } from './types.js';
 import {
   LS_TOOL_NAME,
-  GREP_TOOL_NAME,
-  // READ_FILE_TOOL_NAME,
+  // GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { z } from 'zod';
@@ -57,7 +57,7 @@ export const BuildAndTestAgent: AgentDefinition<
 
   toolConfig: {
     // tools: [LS_TOOL_NAME, GREP_TOOL_NAME, READ_FILE_TOOL_NAME, SHELL_TOOL_NAME],
-    tools: [LS_TOOL_NAME, GREP_TOOL_NAME, SHELL_TOOL_NAME],
+    tools: [LS_TOOL_NAME, READ_FILE_TOOL_NAME, SHELL_TOOL_NAME],
   },
 
   promptConfig: {
@@ -86,14 +86,19 @@ Given the context, first, identify which stage you are in. There are three stage
 You must strictly follow the response format for each stage as described below.
 
 **STAGE 1**
-Your first step is to identify the appropriate build or test command for the project based on the provided objective. You may need to use the \`search_file_content\` and \`list_directory\` tools to explore the project structure. 
+Your first step is to identify the appropriate build or test framework and command for the project based on the provided objective. You may need to use the \`read_file\` and \`list_directory\` tools to explore the project structure.
+
+Some recommended files that may help to find the build or test frameworks and are likely found at the root of the project are:
+- \`package.json\` in JavaScript/TypeScript projects.
+- \`requirements.txt\` or \`pyproject.toml\` in Python projects.
+
 If you decide to make a tool call to gather more information about the project, your response must ONLY contain a one line explanation of why you need extra information, followed by the tool call in JSON format. If you already have enough information, proceed to **STAGE 2**.
 
 Example response:
 I am currently in **STAGE 1**. I need to...
 \`\`\`json
 {
-  "name": "search_file_content",
+  "name": "read_file",
   "parameters": { ... }
 }
 \`\`\`
@@ -114,7 +119,7 @@ I am currently in **STAGE 2**. I need to...
 Example:
 
 **STAGE 3**
-After reading the output of the build or test command, you must determine whether the build or test satisfies the user's objective. If it does not, go back to **STAGE 1** and iterate as needed. If it does, you must highlight the most important findings to the user in no more than five bullet points. Note that build and test commands may have extra logs that are not relevant to the user's objective. Only report key information, especially test and file names, or test numbers, that pertains the user's objective.
+After reading the output of the build or test command, you must determine whether the build or test satisfies the user's objective. If it does not, go back to **STAGE 1** or **STAGE 2** and iterate as needed. If it does, you must highlight the most important findings to the user in no more than five bullet points. Note that build and test commands may have extra logs that are not relevant to the user's objective. Only report key information, especially test and file names, or test numbers, that pertains the user's objective.
 Your response must ONLY contain your highlights, followed by the \`complete_task\` tool call in JSON format.
 
 Example response:

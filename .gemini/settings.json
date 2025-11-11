@@ -24,6 +24,6 @@
     }
   },
   "model": {
-    "summarizeToolOutput": {"run_shell_command": {"token_budget": 5000}}
+    "summarizeToolOutput": { "run_shell_command": { "token_budget": 5000 } }
   }
 }
