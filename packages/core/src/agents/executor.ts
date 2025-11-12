@@ -54,6 +54,7 @@ import type { Part as OllamaPart } from '../core/ollamaChat.js';
 // import { extractValidJson } from '../utils/json.js';
 import { stripJsonMarkdown } from '../utils/json.js';
 import * as fs from 'node:fs/promises';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -242,9 +243,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           break;
         }
 
-        debugLogger.log(
-          `Next message: ${JSON.stringify(nextMessage, null, 2)}`,
-        );
+        // debugLogger.log(
+        //   `[Executor] Next message: ${JSON.stringify(nextMessage, null, 2)}`,
+        // );
 
         currentMessage = nextMessage;
       }
@@ -849,10 +850,35 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         `[AgentExecutor] Scheduling execution for tool: ${functionCall.name} (ID: ${callId})`,
       );
       const executionPromise = (async () => {
+        const outputUpdateHandler = (
+          toolCallId: string,
+          outputChunk: string | AnsiOutput,
+        ) => {
+          let text = '';
+          if (typeof outputChunk === 'string') {
+            text = outputChunk;
+          } else {
+            for (const line of outputChunk) {
+              for (const token of line) {
+                text += token.text;
+              }
+              text += '\n';
+            }
+          }
+          // debugLogger.log(
+          //   `[AgentExecutor] Tool output chunk from ${toolCallId}: ${text}`,
+          // );
+          this.emitActivity('TOOL_OUTPUT_CHUNK', {
+            toolCallId,
+            text,
+          });
+        };
+
         const { response: toolResponse } = await executeToolCall(
           this.runtimeContext,
           requestInfo,
           signal,
+          outputUpdateHandler,
         );
 
         if (toolResponse.error) {

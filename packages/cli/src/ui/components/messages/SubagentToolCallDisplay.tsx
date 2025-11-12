@@ -6,14 +6,15 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-// import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { TOOL_STATUS } from '../../constants.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import type {
+  // SubagentHistoryItem,
   SubagentToolCallHistoryItem,
   SubagentToolResponseHistoryItem,
 } from '../../types.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const STATUS_INDICATOR_WIDTH = 2;
 
@@ -27,6 +28,11 @@ export const SubagentToolCallDisplay: React.FC<
   SubagentToolCallDisplayProps
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
 > = ({ toolCall, toolResponse, terminalWidth }) => {
+  debugLogger.log(
+    `[SubagentToolCallDisplay] Rendering with subagentHistory: ${JSON.stringify(
+      undefined,
+    )}`,
+  );
   const status = toolResponse
     ? toolResponse.data.isError
       ? 'error'
@@ -53,18 +59,16 @@ export const SubagentToolCallDisplay: React.FC<
           description={JSON.stringify(toolCall.data.args)}
         />
       </Box>
-      {toolResponse && (
+      {toolResponse && typeof toolResponse.data.output === 'string' && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
           <Box flexDirection="column">
-            {String(toolResponse.data.output ?? 'No output')
-              .split('\n')
-              .map((line, index) => (
-                <Box key={index}>
-                  <Text wrap="wrap" color={theme.text.primary}>
-                    {line}
-                  </Text>
-                </Box>
-              ))}
+            {toolResponse.data.output.split('\n').map((line, index) => (
+              <Box key={index}>
+                <Text wrap="wrap" color={theme.text.primary}>
+                  {line}
+                </Text>
+              </Box>
+            ))}
           </Box>
         </Box>
       )}

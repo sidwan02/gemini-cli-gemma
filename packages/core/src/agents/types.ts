@@ -43,7 +43,12 @@ export type AgentInputs = Record<string, unknown>;
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;
-  type: 'TOOL_CALL_START' | 'TOOL_CALL_END' | 'THOUGHT_CHUNK' | 'ERROR';
+  type:
+    | 'TOOL_CALL_START'
+    | 'TOOL_CALL_END'
+    | 'THOUGHT_CHUNK'
+    | 'ERROR'
+    | 'TOOL_OUTPUT_CHUNK';
   data: Record<string, unknown>;
 }
 

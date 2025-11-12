@@ -7,7 +7,6 @@
 import { Ollama } from 'ollama';
 import type { OllamaModelConfig } from '../agents/types.js';
 import type { Content as GeminiContent } from '@google/genai';
-import { debugLogger } from '../utils/debugLogger.js';
 // import { debugLogger } from '../utils/debugLogger.js';
 
 // #region Self-contained types
@@ -118,7 +117,7 @@ export class OllamaChat {
       userParts.push({ text: params.message as string });
     }
 
-    debugLogger.log('[OllamaChat] Sending user message:', userParts);
+    // debugLogger.log('[OllamaChat] Sending user message:', userParts);
 
     const userContent: Content = {
       role: 'user',

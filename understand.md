@@ -224,23 +224,29 @@ Using the codebase investigator: tell me how the ollama inference works.
 ## BuildAndTest
 
 - `use the build and test tool: run npm test -- src/tools/glob.test.ts`
+- `use the build and test tool: test src/tools/glob.test.ts`
 
 # TODO:
 
+1. Not just the directive but also the tool calls and objective should be added
+   to the last user message. so: last user message + system prommpt + objective.
+   Maybe no longer have the objective as the first think in the system prompt (I
+   think that's wehre it is right now?)
+
 1. subagent tool call width should be smaller
-2. grep tool call is \*/\*\* which is way too generic need to make the tool
+1. grep tool call is \*/\*\* which is way too generic need to make the tool
    calls much more constrained
-3. When reading a file that contains a prompt gets confused/breaks
-4. When reading a file that contains functions, it parses those as unauthorized
+1. When reading a file that contains a prompt gets confused/breaks
+1. When reading a file that contains functions, it parses those as unauthorized
    function calls
-5. The glob command and any patterns are always ‘single’ patterns rather than
+1. The glob command and any patterns are always ‘single’ patterns rather than
    more complex ones. The model should be partial to more complex regex for
    better user experience. Eg, model never does pattern=\**/*blah\* for
    searching, instead does pattern=blah
-6. When listing files related to a search term, unnecessarily uses
+1. When listing files related to a search term, unnecessarily uses
    list_directory and doesn’t know where the files are (can’t feed the entire
    environment either due to prompt forgetting)
-7. Gemma often forgets which files it's already looked at.
+1. Gemma often forgets which files it's already looked at.
 
 # Litellm setup
 

@@ -16,7 +16,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-import { ShellInputPrompt } from '../ShellInputPrompt.js';
+// import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -24,8 +24,10 @@ import {
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
+// import type { Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { SubagentHistoryDisplay } from './SubagentHistoryDisplay.js';
+// import { debugLogger } from '@google/gemini-cli-core';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -128,6 +130,15 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
     }
   }
+
+  // debugLogger.log(
+  //   `[ToolMessage] Rendering tool message for tool '${name}' with status '${status}' with subagentHistory latest message: ${
+  //     subagentHistory && subagentHistory.length > 0
+  //       ? JSON.stringify(subagentHistory[subagentHistory.length - 1].data)
+  //       : 'N/A'
+  //   }`,
+  // );
+
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
@@ -147,7 +158,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         )}
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
-      {subagentHistory && (
+      {subagentHistory ? (
         <Box
           borderStyle="round"
           borderColor={theme.border.default}
@@ -159,8 +170,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
             terminalWidth={terminalWidth - 2} // Account for padding
           />
         </Box>
-      )}
-      {resultDisplay && !subagentHistory && (
+      ) : resultDisplay ? (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
             {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
@@ -202,14 +212,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
             )}
           </Box>
         </Box>
-      )}
-      {isThisShellFocused && config && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
-          <ShellInputPrompt
-            activeShellPtyId={activeShellPtyId ?? null}
-            focus={embeddedShellFocused}
-          />
-        </Box>
+      ) : (
+        <></>
       )}
     </Box>
   );

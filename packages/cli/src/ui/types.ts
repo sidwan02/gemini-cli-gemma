@@ -381,6 +381,10 @@ export type SubagentHistoryItem =
       data: { name: string; output: unknown; isError?: boolean };
     }
   | {
+      type: 'tool_output_chunk';
+      data: { toolCallId: string; text: string };
+    }
+  | {
       type: 'error';
       data: { error: string; context?: string; name?: string };
     };

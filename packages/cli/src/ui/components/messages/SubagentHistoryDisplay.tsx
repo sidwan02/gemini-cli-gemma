@@ -14,6 +14,7 @@ import type {
 } from '../../types.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { SubagentToolCallDisplay } from './SubagentToolCallDisplay.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface SubagentHistoryDisplayProps {
   history: SubagentHistoryItem[];
@@ -24,6 +25,7 @@ type SubagentTurn = {
   thought?: SubagentThoughtHistoryItem;
   toolCall?: SubagentToolCallHistoryItem;
   toolResponse?: SubagentToolResponseHistoryItem;
+  subagentHistory?: SubagentHistoryItem[];
 };
 
 type ProcessedHistoryItem = SubagentTurn | SubagentHistoryItem;
@@ -36,44 +38,89 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
   history,
   terminalWidth,
 }) => {
+  // debugLogger.log(
+  //   `[SubagentHistoryDisplay] Rendering with latest history: ${JSON.stringify(
+  //     history[history.length - 1].data,
+  //   )}`,
+  // );
   const processedHistory = history.reduce((acc, item) => {
     if (item.type === 'start' || item.type === 'error') {
       acc.push(item);
       return acc;
     }
 
-    let lastItem = acc[acc.length - 1];
+    let lastTurn = acc[acc.length - 1] as SubagentTurn;
 
     // Ensure lastItem is a turn, creating one if necessary.
-    if (!lastItem || !isSubagentTurn(lastItem)) {
-      lastItem = {};
-      acc.push(lastItem);
+    if (!lastTurn || !isSubagentTurn(lastTurn)) {
+      lastTurn = {};
+      acc.push(lastTurn);
     }
 
-    const lastTurn = lastItem as SubagentTurn;
-
-    if (item.type === 'thought') {
-      if (lastTurn.thought) {
-        acc.push({ thought: item });
-      } else {
-        lastTurn.thought = item;
-      }
-    } else if (item.type === 'tool_call') {
-      if (lastTurn.toolCall) {
-        acc.push({ toolCall: item });
-      } else {
-        lastTurn.toolCall = item;
-      }
-    } else if (item.type === 'tool_response') {
-      if (lastTurn.toolResponse) {
-        // This case might indicate a new turn should start,
-        // but for now, we'll just overwrite.
-        lastTurn.toolResponse = item;
-      } else {
-        lastTurn.toolResponse = item;
-      }
+    switch (item.type) {
+      case 'thought':
+        if (lastTurn.thought) {
+          acc.push({ thought: item });
+        } else {
+          lastTurn.thought = item;
+        }
+        break;
+      case 'tool_call':
+        if (lastTurn.toolCall) {
+          acc.push({ toolCall: item });
+        } else {
+          lastTurn.toolCall = item;
+        }
+        break;
+      case 'tool_response':
+        if (lastTurn.toolResponse) {
+          acc.push({ toolResponse: item });
+        } else {
+          lastTurn.toolResponse = item;
+        }
+        break;
+      case 'tool_output_chunk':
+        // A tool output chunk should be associated with a tool call.
+        // Find the last turn with a tool call.
+        if (lastTurn.toolCall) {
+          if (lastTurn.toolResponse) {
+            // Append to existing toolResponse output
+            lastTurn.toolResponse.data.output =
+              ((lastTurn.toolResponse.data.output as string) || '') +
+              item.data.text;
+          } else {
+            // First chunk, create the toolResponse
+            lastTurn.toolResponse = {
+              type: 'tool_response',
+              data: {
+                name: lastTurn.toolCall.data.name, // Use name from toolCall
+                output: item.data.text,
+              },
+            };
+          }
+        } else {
+          // This case is unexpected. A tool_output_chunk should follow a tool_call.
+          // We could log an error here. For now, we can try to handle it gracefully
+          // by creating a new turn, but this indicates a logic issue elsewhere.
+          debugLogger.error(
+            `[SubagentHistoryDisplay] Received TOOL_OUTPUT_CHUNK without a preceding TOOL_CALL.`,
+          );
+          // To avoid crashing, we can create a new turn, but this is not ideal.
+          acc.push({
+            toolResponse: {
+              type: 'tool_response',
+              data: {
+                name: '', // We don't know the name
+                output: item.data.text,
+              },
+            },
+          });
+        }
+        break;
+      default:
+        debugLogger.error(`[SubagentHistoryDisplay] Unknown item type.`);
+        break;
     }
-
     return acc;
   }, [] as ProcessedHistoryItem[]);
 

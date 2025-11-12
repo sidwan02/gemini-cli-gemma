@@ -99,6 +99,7 @@ export function useReactToolScheduler(
           'GEMINI_SUBAGENT_THOUGHT::': 'thought',
           'GEMINI_SUBAGENT_TOOL_CALL::': 'tool_call',
           'GEMINI_SUBAGENT_TOOL_RESPONSE::': 'tool_response',
+          'GEMINI_SUBAGENT_TOOL_OUTPUT_CHUNK::': 'tool_output_chunk',
           'GEMINI_SUBAGENT_ERROR::': 'error',
         };
 
@@ -120,6 +121,12 @@ export function useReactToolScheduler(
                       data,
                     };
 
+                    // debugLogger.log(
+                    //   `[useReactToolScheduler] Received subagent history item: ${JSON.stringify(
+                    //     newHistoryItem,
+                    //   )}`,
+                    // );
+
                     const currentHistory = executingTc.subagentHistory || [];
                     const lastHistoryItem =
                       currentHistory.length > 0
@@ -136,6 +143,18 @@ export function useReactToolScheduler(
                         ...currentHistory.slice(0, -1),
                         newHistoryItem,
                       ];
+                    } else if (
+                      newHistoryItem.type === 'tool_output_chunk' &&
+                      lastHistoryItem?.type === 'tool_output_chunk'
+                    ) {
+                      // Replace the last tool output chunk with the new one
+                      newHistory = [
+                        ...currentHistory.slice(0, -1),
+                        newHistoryItem,
+                      ];
+                      debugLogger.log(
+                        `[useReactToolScheduler] Got tool_output_chunk with new history item: ${newHistoryItem.data.text}`,
+                      );
                     } else {
                       // Append the new item
                       newHistory = [...currentHistory, newHistoryItem];
@@ -208,6 +227,8 @@ export function useReactToolScheduler(
             responseSubmittedToGemini,
             liveOutput: undefined,
             pid: undefined,
+            subagentHistory: (existingTrackedCall as TrackedExecutingToolCall)
+              ?.subagentHistory,
           };
         }),
       );
