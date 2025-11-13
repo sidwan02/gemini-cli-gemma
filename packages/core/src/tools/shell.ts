@@ -43,7 +43,7 @@ import {
 
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { debugLogger } from '../utils/debugLogger.js';
+// import { debugLogger } from '../utils/debugLogger.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -344,11 +344,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
       // ✓ sortFileEntries > should correctly sort files when mtimes are identical for recent files (maintaining mtime sort) 0ms
       //       `;
 
-      debugLogger.log(`[Debug] ShellToolInvocation result: ${result.output}`);
+      // debugLogger.log(`[Debug] ShellToolInvocation result: ${result.output}`);
       result.output = stripPtyFrame(result.output);
-      debugLogger.log(
-        `[Debug] ShellToolInvocation stripped output: ${result.output}`,
-      );
+      // debugLogger.log(
+      //   `[Debug] ShellToolInvocation stripped output: ${result.output}`,
+      // );
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {

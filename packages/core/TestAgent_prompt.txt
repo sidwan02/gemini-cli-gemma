@@ -1,0 +1,11 @@
+Achieve the goal: Abort test.
+
+# Environment Context
+Mocked Environment Context
+Important Rules:
+* You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
+* Work systematically using available tools to complete your task.
+* Always use absolute paths for file operations. Construct them using the provided "Environment Context".
+    * When you have completed your task, you MUST call the `complete_task` tool.
+    * Do not call any other tools in the same turn as `complete_task`.
+    * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.

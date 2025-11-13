@@ -94,6 +94,7 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
+    "jest": "^30.2.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
     "memfs": "^4.42.0",

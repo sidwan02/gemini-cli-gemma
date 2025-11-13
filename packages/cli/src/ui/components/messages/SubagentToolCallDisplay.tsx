@@ -14,7 +14,7 @@ import type {
   SubagentToolCallHistoryItem,
   SubagentToolResponseHistoryItem,
 } from '../../types.js';
-import { debugLogger } from '@google/gemini-cli-core';
+// import { debugLogger } from '@google/gemini-cli-core';
 
 const STATUS_INDICATOR_WIDTH = 2;
 
@@ -28,11 +28,11 @@ export const SubagentToolCallDisplay: React.FC<
   SubagentToolCallDisplayProps
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
 > = ({ toolCall, toolResponse, terminalWidth }) => {
-  debugLogger.log(
-    `[SubagentToolCallDisplay] Rendering with subagentHistory: ${JSON.stringify(
-      undefined,
-    )}`,
-  );
+  // debugLogger.log(
+  //   `[SubagentToolCallDisplay] Rendering with subagentHistory: ${JSON.stringify(
+  //     undefined,
+  //   )}`,
+  // );
   const status = toolResponse
     ? toolResponse.data.isError
       ? 'error'

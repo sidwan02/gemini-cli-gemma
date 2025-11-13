@@ -152,9 +152,9 @@ export function useReactToolScheduler(
                         ...currentHistory.slice(0, -1),
                         newHistoryItem,
                       ];
-                      debugLogger.log(
-                        `[useReactToolScheduler] Got tool_output_chunk with new history item: ${newHistoryItem.data.text}`,
-                      );
+                      // debugLogger.log(
+                      //   `[useReactToolScheduler] Got tool_output_chunk with new history item: ${newHistoryItem.data.text}`,
+                      // );
                     } else {
                       // Append the new item
                       newHistory = [...currentHistory, newHistoryItem];

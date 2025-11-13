@@ -43,6 +43,7 @@ import type {
   OllamaModelConfig,
   OutputObject,
   SubagentActivityEvent,
+  PromptConfig,
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
@@ -612,11 +613,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     // );
 
     if ('host' in modelConfig) {
+      const populatedPromptConfig: PromptConfig = {
+        ...promptConfig,
+        systemPrompt: systemInstruction ?? '',
+        directive: this.definition.promptConfig.directive,
+        query: this.definition.promptConfig.query
+          ? templateString(this.definition.promptConfig.query, inputs)
+          : 'Get Started!',
+      };
       return new OllamaChat(
         modelConfig as OllamaModelConfig,
         systemInstruction,
         startHistory,
-        promptConfig.directive,
+        populatedPromptConfig,
       );
     } else {
       try {
@@ -1001,7 +1010,55 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (promptConfig.systemPrompt.includes('${tool_code}')) {
       const tools = this.prepareToolsList();
-      const toolCode = `${JSON.stringify(tools, null, 2)}`;
+      // Need the tool declaration to be of a certain format for gemma: https://ai.google.dev/gemma/docs/capabilities/function-calling#function-definition
+      const toolCode = `${JSON.stringify(
+        tools.map((tool) => {
+          type ToolWithBothParams = FunctionDeclaration & {
+            parametersJsonSchema?: unknown;
+          };
+          // Create a mutable copy of the tool to avoid modifying the original
+          const newTool: ToolWithBothParams = { ...tool };
+
+          // If 'parametersJsonSchema' exists, convert it to 'parameters'
+          if ('parametersJsonSchema' in newTool) {
+            newTool.parameters = newTool.parametersJsonSchema as Schema;
+            delete newTool.parametersJsonSchema;
+          }
+
+          // Process parameters to remove any parameter named 'description'
+          if (newTool.parameters && newTool.parameters.properties) {
+            const newProperties: Record<string, Schema> = {};
+            for (const propName in newTool.parameters.properties) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  newTool.parameters.properties,
+                  propName,
+                )
+              ) {
+                // Only include properties that are not named 'description'
+                if (propName !== 'description') {
+                  newProperties[propName] =
+                    newTool.parameters.properties[propName];
+                }
+              }
+            }
+            newTool.parameters = {
+              ...newTool.parameters,
+              properties: newProperties,
+            };
+
+            // Also update the 'required' array if 'description' was listed as required
+            if (newTool.parameters.required) {
+              newTool.parameters.required = newTool.parameters.required.filter(
+                (reqProp) => reqProp !== 'description',
+              );
+            }
+          }
+          return newTool;
+        }),
+        null,
+        2,
+      )}`;
       templateInputs['tool_code'] = toolCode;
     }
 

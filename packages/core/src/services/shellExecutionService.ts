@@ -19,7 +19,7 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import { debugLogger } from '../utils/debugLogger.js';
+// import { debugLogger } from '../utils/debugLogger.js';
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
@@ -296,15 +296,15 @@ export class ShellExecutionService {
 
           if (isStreamingRawContent) {
             if (finalStrippedOutput) {
-              debugLogger.log(
-                `[ShellExecutionService] Calling onOutputEvent (child_process) with chunk: ${finalStrippedOutput}`,
-              );
+              // debugLogger.log(
+              //   `[ShellExecutionService] Calling onOutputEvent (child_process) with chunk: ${finalStrippedOutput}`,
+              // );
               onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
             }
           } else {
-            debugLogger.log(
-              `[ShellExecutionService] Calling onOutputEvent (child_process) with binary_detected`,
-            );
+            // debugLogger.log(
+            //   `[ShellExecutionService] Calling onOutputEvent (child_process) with binary_detected`,
+            // );
             onOutputEvent({ type: 'binary_detected' });
           }
 
@@ -520,11 +520,11 @@ export class ShellExecutionService {
           // Using stringify for a quick deep comparison.
           if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
             output = finalOutput;
-            debugLogger.log(
-              `[ShellExecutionService] Calling onOutputEvent (pty) with chunk: ${JSON.stringify(
-                finalOutput,
-              )}`,
-            );
+            // debugLogger.log(
+            //   `[ShellExecutionService] Calling onOutputEvent (pty) with chunk: ${JSON.stringify(
+            //     finalOutput,
+            //   )}`,
+            // );
             onOutputEvent({
               type: 'data',
               chunk: finalOutput,

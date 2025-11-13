@@ -96,6 +96,11 @@ export interface PromptConfig {
   directive?: string;
 
   /**
+   * A reminder to be appended to the last user message.
+   */
+  reminder?: string;
+
+  /**
    * The specific task or question to trigger the agent's execution loop.
    * This is sent as the first user message, distinct from the systemPrompt (identity/rules)
    * and initialMessages (history/few-shots). Supports templating.

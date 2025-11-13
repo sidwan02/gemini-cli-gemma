@@ -5,9 +5,10 @@
  */
 
 import { Ollama } from 'ollama';
-import type { OllamaModelConfig } from '../agents/types.js';
+import type { OllamaModelConfig, PromptConfig } from '../agents/types.js';
 import type { Content as GeminiContent } from '@google/genai';
 // import { debugLogger } from '../utils/debugLogger.js';
+import * as fs from 'node:fs/promises';
 
 // #region Self-contained types
 // These types are defined locally to avoid any dependency on @google/genai.
@@ -70,17 +71,17 @@ export class OllamaChat {
   private history: Content[] = [];
   private readonly ollama: Ollama;
   private readonly systemInstruction?: string;
-  private readonly directive?: string;
+  private readonly promptConfig?: PromptConfig;
 
   constructor(
     private readonly modelConfig: OllamaModelConfig,
     systemInstruction?: string,
     history?: GeminiContent[],
-    directive?: string,
+    promptConfig?: PromptConfig,
   ) {
     this.ollama = new Ollama({ host: modelConfig.host });
     this.systemInstruction = systemInstruction;
-    this.directive = directive;
+    this.promptConfig = promptConfig;
     if (history) {
       this.history = history
         .filter(
@@ -128,7 +129,7 @@ export class OllamaChat {
 
     // Create a temporary message list for this turn, optionally appending the directive.
     let messagesForApi = currentHistory.map(toOllamaMessage);
-    if (this.directive) {
+    if (this.promptConfig) {
       // Deep copy to avoid mutating the original history content.
       messagesForApi = JSON.parse(JSON.stringify(messagesForApi));
       const lastMessage = messagesForApi[messagesForApi.length - 1];
@@ -136,8 +137,19 @@ export class OllamaChat {
       // Add the directive instruction to the user query or latest tool
       // response.
       if (lastMessage.role === 'user' && lastMessage.content) {
-        lastMessage.content += `\n\n${this.directive}`;
+        // lastMessage.content = `${this.promptConfig.directive}\n\n${this.promptConfig.query}\n\n${lastMessage.content}`;
+
+        // lastMessage.content = `${this.promptConfig.directive}\n\n${lastMessage.content}`;
+        // lastMessage.content = `${this.promptConfig.directive}\n\n${lastMessage.content}`;
+        if (this.promptConfig.reminder) {
+          lastMessage.content += this.promptConfig.reminder;
+        }
+        // lastMessage.content += `\n\n${this.promptConfig.directive}`;
       }
+      await fs.writeFile(
+        'subagent_last_message_content.txt',
+        lastMessage.content,
+      );
     }
 
     this.history.push(userContent);
