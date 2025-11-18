@@ -355,3 +355,21 @@ curl -L -X POST 'http://localhost:4000/v1beta/models/gemini-2.5-flash-lite:gener
   }
 }'
 ```
+
+# Links
+
+## Gemma
+
+-
+
+## LiteLLM
+
+- https://github.com/BerriAI/litellm/pull/12081/files
+- https://github.com/BerriAI/litellm/discussions/12080
+- https://docs.litellm.ai/docs/proxy/docker_quick_start
+- https://docs.litellm.ai/docs/tutorials/litellm_gemini_cli
+- https://github.com/BerriAI/litellm/tree/main
+- https://docs.litellm.ai/docs/routing
+- https://docs.litellm.ai/docs/providers/gemini
+- https://docs.litellm.ai/docs/generateContent#:~:text=Google%20GenAI%20SDK%20with%20LiteLLM,%7D'
+- https://docs.litellm.ai/docs/providers/ollama#example-usage---streaming--acompletion

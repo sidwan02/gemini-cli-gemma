@@ -496,6 +496,7 @@ My setup is complete. I will provide my first command in the next turn.
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    // debugLogger.log(`Sending message stream ==============`);
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
@@ -590,6 +591,13 @@ My setup is complete. I will provide my first command in the next turn.
     if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
+      // debuglogger.log(`Routing-------`);
+      // The router is not called every time sendMessageStream is invoked. It is called only once per "sequence" to determine the model to use. Once a model is
+      // selected and assigned to this.currentSequenceModel, that model is reused for subsequent calls within the same sequence, effectively "locking" the model for
+      // that sequence. The router is only invoked again if this.currentSequenceModel is null, which happens when a new sequence starts (e.g., this.lastPromptId
+      // changes or the client is reset).
+      // The "stickiness" of this.currentSequenceModel applies to subsequent turns within the same prompt sequence (e.g., when the model calls a tool and then
+      // continues, or when it decides to continue speaking on its own).
       const router = await this.config.getModelRouterService();
       const decision = await router.route(routingContext);
       modelToUse = decision.model;

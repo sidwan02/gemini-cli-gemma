@@ -4,7 +4,7 @@
       "enabled": false
     },
     "gemmaSubagentSettings": {
-      "enabled": true,
+      "enabled": false,
       "model": "gemma3n:e4b"
     },
     "buildAndTestSettings": {
@@ -14,7 +14,7 @@
     },
     "useModelRouter": {
       "useGemmaRouting": {
-        "enabled": false,
+        "enabled": true,
         "host": "http://localhost:11434",
         // "model": "gemma3n:e4b"
         // "model": "gemma3n:e2b"
