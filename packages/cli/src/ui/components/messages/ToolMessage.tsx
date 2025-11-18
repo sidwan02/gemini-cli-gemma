@@ -6,7 +6,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { IndividualToolCallDisplay } from '../../types.js';
+import type {
+  IndividualToolCallDisplay,
+  SubagentHistoryItem, // ADDED
+} from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
@@ -24,6 +27,7 @@ import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { SubagentHistoryDisplay } from './SubagentHistoryDisplay.js'; // ADDED
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -46,6 +50,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   borderColor: string;
   borderDimColor: boolean;
   config?: Config;
+  subagentHistory?: SubagentHistoryItem[]; // ADDED
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -64,6 +69,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   isFirst,
   borderColor,
   borderDimColor,
+  subagentHistory, // ADDED
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -234,7 +240,22 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         paddingX={1}
         flexDirection="column"
       >
-        {renderedResult}
+        {subagentHistory ? ( // START OF MERGED LOGIC
+          <Box
+            borderStyle="round"
+            borderColor={theme.border.default}
+            paddingX={1}
+            marginTop={1}
+          >
+            <SubagentHistoryDisplay
+              history={subagentHistory}
+              terminalWidth={terminalWidth - 2} // terminalWidth - 2 (left/right padding of ToolMessage's root Box in the old structure)
+            />
+          </Box>
+        ) : (
+          renderedResult && <Box marginTop={1}>{renderedResult}</Box>
+        )}
+
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
             <ShellInputPrompt

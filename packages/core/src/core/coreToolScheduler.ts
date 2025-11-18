@@ -26,6 +26,7 @@ import {
   logToolOutputTruncated,
   ToolOutputTruncatedEvent,
   runInDevTraceSpan,
+  debugLogger,
 } from '../index.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
@@ -1070,6 +1071,14 @@ export class CoreToolScheduler {
   private async attemptExecutionOfScheduledCalls(
     signal: AbortSignal,
   ): Promise<void> {
+    debugLogger.log(
+      'Attempting execution of scheduled tool calls. Current tool call statuses:',
+    );
+    for (const call of this.toolCalls) {
+      debugLogger.log(
+        `- Tool Call ID: ${call.request.callId}, Name: ${call.request.name}, Status: ${call.status}`,
+      );
+    }
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
@@ -1084,6 +1093,9 @@ export class CoreToolScheduler {
       );
 
       for (const toolCall of callsToExecute) {
+        debugLogger.log(
+          `Starting execution of scheduled tool call: ${toolCall.request.name} (ID: ${toolCall.request.callId})`,
+        );
         if (toolCall.status !== 'scheduled') continue;
 
         const scheduledCall = toolCall;
@@ -1131,6 +1143,9 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
+              debugLogger.log(
+               `Executing shell tool invocation for tool call ID: ${callId}`,
+              );
               promise = invocation.execute(
                 signal,
                 liveOutputCallback,
@@ -1138,6 +1153,9 @@ export class CoreToolScheduler {
                 setPidCallback,
               );
             } else {
+              debugLogger.log(
+                `Executing non-shell tool invocation for tool call ID: ${callId}`,
+              );
               promise = invocation.execute(
                 signal,
                 liveOutputCallback,
@@ -1388,7 +1406,10 @@ export class CoreToolScheduler {
   }
 
   private isAutoApproved(toolCall: ValidatingToolCall): boolean {
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+    if (
+      this.config.getApprovalMode() === ApprovalMode.YOLO ||
+      toolCall.request.isSubagent
+    ) {
       return true;
     }
 

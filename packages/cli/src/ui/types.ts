@@ -72,6 +72,7 @@ export interface IndividualToolCallDisplay {
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
+  subagentHistory?: SubagentHistoryItem[];
 }
 
 export interface CompressionProps {
@@ -382,3 +383,36 @@ export interface ConfirmationRequest {
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
 }
+
+export type SubagentHistoryItem =
+  | { type: 'start'; data: { agentName: string; inputs: unknown } }
+  | { type: 'thought'; data: { thought: string } }
+  | {
+      type: 'tool_call';
+      data: { name: string; args: unknown };
+    }
+  | {
+      type: 'tool_response';
+      data: { name: string; output: unknown; isError?: boolean };
+    }
+  | {
+      type: 'tool_output_chunk';
+      data: { toolCallId: string; text: string };
+    }
+  | {
+      type: 'error';
+      data: { error: string; context?: string; name?: string };
+    };
+
+export type SubagentThoughtHistoryItem = Extract<
+  SubagentHistoryItem,
+  { type: 'thought' }
+>;
+export type SubagentToolCallHistoryItem = Extract<
+  SubagentHistoryItem,
+  { type: 'tool_call' }
+>;
+export type SubagentToolResponseHistoryItem = Extract<
+  SubagentHistoryItem,
+  { type: 'tool_response' }
+>;

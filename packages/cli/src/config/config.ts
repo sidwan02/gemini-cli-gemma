@@ -553,10 +553,11 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const useModelRouter = settings.experimental?.useModelRouter ?? true;
-  const defaultModel = useModelRouter
-    ? DEFAULT_GEMINI_MODEL_AUTO
-    : DEFAULT_GEMINI_MODEL;
+  const useModelRouter = settings.experimental?.useModelRouter;
+  const defaultModel =
+    (useModelRouter?.enabled ?? true)
+      ? DEFAULT_GEMINI_MODEL_AUTO
+      : DEFAULT_GEMINI_MODEL;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
@@ -647,10 +648,16 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter,
+    useModelRouter: {
+      enabled: useModelRouter?.enabled,
+      useGemmaRouting: useModelRouter?.useGemmaRouting,
+    },
     enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+
+    buildAndTestSettings: settings.experimental?.buildAndTestSettings,
+    gemmaSubagentSettings: settings.experimental?.gemmaSubagentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,

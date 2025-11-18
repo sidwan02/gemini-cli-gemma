@@ -105,6 +105,7 @@ export interface ToolCallRequestInfo {
   name: string;
   args: Record<string, unknown>;
   isClientInitiated: boolean;
+  isSubagent?: boolean;
   prompt_id: string;
 }
 

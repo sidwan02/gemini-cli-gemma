@@ -781,7 +781,7 @@ describe('Server Config (config.ts)', () => {
     it('should enable model router for other auth type', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
         disableModelRouterForAuth: [],
       });
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
@@ -791,7 +791,7 @@ describe('Server Config (config.ts)', () => {
     it('should keep model router disabled when useModelRouter is false', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: false,
+        useModelRouter: { enabled: false },
         disableModelRouterForAuth: [AuthType.USE_GEMINI],
       });
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);

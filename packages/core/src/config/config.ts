@@ -124,6 +124,27 @@ export interface CodebaseInvestigatorSettings {
   model?: string;
 }
 
+export interface GemmaSubagentSettings {
+  enabled?: boolean;
+  model?: string;
+  host?: string;
+}
+
+export interface BuildAndTestSettings {
+  enabled?: boolean;
+  model?: string;
+  host?: string;
+}
+
+export interface UseModelRouterSettings {
+  enabled?: boolean;
+  useGemmaRouting?: {
+    enabled?: boolean;
+    model?: string;
+    host?: string;
+  };
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -288,10 +309,12 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
-  useModelRouter?: boolean;
+  useModelRouter?: UseModelRouterSettings;
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  buildAndTestSettings?: BuildAndTestSettings;
+  gemmaSubagentSettings?: GemmaSubagentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -402,11 +425,13 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private useModelRouter: boolean;
+  private readonly useModelRouter: UseModelRouterSettings;
   private readonly initialUseModelRouter: boolean;
   private readonly disableModelRouterForAuth?: AuthType[];
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly buildAndTestSettings: BuildAndTestSettings;
+  private readonly gemmaSubagentSettings: GemmaSubagentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -520,7 +545,16 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
-    this.useModelRouter = this.initialUseModelRouter;
+    this.useModelRouter = {
+      enabled: params.useModelRouter?.enabled ?? false,
+      useGemmaRouting: {
+        enabled: params.useModelRouter?.useGemmaRouting?.enabled ?? false,
+        model: params.useModelRouter?.useGemmaRouting?.model ?? 'gemma3n:e2b',
+        host:
+          params.useModelRouter?.useGemmaRouting?.host ??
+          'http://localhost:11434',
+      },
+    };
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
     this.enableHooks = params.enableHooks ?? false;
 
@@ -541,6 +575,19 @@ export class Config {
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
     };
+    this.gemmaSubagentSettings = {
+      enabled: params.gemmaSubagentSettings?.enabled ?? false,
+      model: params.gemmaSubagentSettings?.model ?? 'gemma3n:e2b',
+      host: params.gemmaSubagentSettings?.host ?? 'http://localhost:11434',
+    };
+    this.buildAndTestSettings = {
+      enabled: params.buildAndTestSettings?.enabled ?? false,
+      model: params.buildAndTestSettings?.model ?? 'gemma3n:e4b',
+      host: params.buildAndTestSettings?.host ?? 'http://localhost:11434',
+    };
+    // debugLogger.log(
+    //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,
+    // );
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
@@ -1331,7 +1378,7 @@ export class Config {
   }
 
   getUseModelRouter(): boolean {
-    return this.useModelRouter;
+    return this.useModelRouter.enabled ?? false;
   }
 
   async getGitService(): Promise<GitService> {
@@ -1362,8 +1409,20 @@ export class Config {
     return this.enableHooks;
   }
 
+  getUseGemmaRoutingSettings(): UseModelRouterSettings['useGemmaRouting'] {
+    return this.useModelRouter.useGemmaRouting;
+  }
+
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
+  }
+
+  getGemmaSubagentSettings(): GemmaSubagentSettings {
+    return this.gemmaSubagentSettings;
+  }
+
+  getBuildAndTestSettings(): BuildAndTestSettings {
+    return this.buildAndTestSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -1457,6 +1516,52 @@ export class Config {
           !allowedTools || allowedTools.includes(definition.name);
 
         if (isAllowed) {
+          const messageBusEnabled = this.getEnableMessageBusIntegration();
+          const wrapper = new SubagentToolWrapper(
+            definition,
+            this,
+            messageBusEnabled ? this.getMessageBus() : undefined,
+          );
+          registry.registerTool(wrapper);
+        }
+      }
+    }
+    if (this.getGemmaSubagentSettings().enabled) {
+      const definition = this.agentRegistry.getDefinition('gemma_agent');
+      if (definition) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
+          const messageBusEnabled = this.getEnableMessageBusIntegration();
+          const wrapper = new SubagentToolWrapper(
+            definition,
+            this,
+            messageBusEnabled ? this.getMessageBus() : undefined,
+          );
+          registry.registerTool(wrapper);
+        }
+      }
+    }
+    if (this.getBuildAndTestSettings().enabled) {
+      const definition = this.agentRegistry.getDefinition(
+        'build_and_test_agent',
+      );
+      if (definition) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
           const messageBusEnabled = this.getEnableMessageBusIntegration();
           const wrapper = new SubagentToolWrapper(
             definition,

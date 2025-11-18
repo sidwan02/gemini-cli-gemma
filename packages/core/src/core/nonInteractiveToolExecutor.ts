@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolCallRequestInfo, Config } from '../index.js';
+import type {
+  ToolCallRequestInfo,
+  Config,
+  OutputUpdateHandler,
+} from '../index.js';
 import {
   CoreToolScheduler,
   type CompletedToolCall,
@@ -17,6 +21,7 @@ export async function executeToolCall(
   config: Config,
   toolCallRequest: ToolCallRequestInfo,
   abortSignal: AbortSignal,
+  outputUpdateHandler?: OutputUpdateHandler,
 ): Promise<CompletedToolCall> {
   return new Promise<CompletedToolCall>((resolve, reject) => {
     const scheduler = new CoreToolScheduler({
@@ -26,6 +31,7 @@ export async function executeToolCall(
       onAllToolCallsComplete: async (completedToolCalls) => {
         resolve(completedToolCalls[0]);
       },
+      outputUpdateHandler,
     });
 
     scheduler.schedule(toolCallRequest, abortSignal).catch((error) => {

@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import { Type } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
+import { OllamaChat } from '../core/ollamaChat.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { Type } from '@google/genai';
 import type {
-  Content,
-  Part,
+  Content as GeminiContent,
+  Part as GeminiPart,
   FunctionCall,
   GenerateContentConfig,
   FunctionDeclaration,
@@ -28,6 +31,7 @@ import {
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
+  SHELL_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -44,8 +48,11 @@ import {
 import type {
   AgentDefinition,
   AgentInputs,
+  ModelConfig,
+  OllamaModelConfig,
   OutputObject,
   SubagentActivityEvent,
+  PromptConfig,
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
@@ -53,6 +60,11 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { Part as OllamaPart } from '../core/ollamaChat.js';
+// import { extractValidJson } from '../utils/json.js';
+import { stripJsonMarkdown } from '../utils/json.js';
+import * as fs from 'node:fs/promises';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -188,11 +200,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
+      
+    
+    debugLogger.log('Prompt ID: ' + promptId);
 
     await this.tryCompressChat(chat, promptId);
 
-    const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
+    // The textResponse is not deconstructed from callModel, but it's used to emit/yield thoughts and streamed chunks to the UI.
+    const { functionCalls, textResponse } = await promptIdContext.run(
+      promptId,
+      async () =>
+        this.callModel(chat, currentMessage, tools, signal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -224,12 +242,26 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
+
+      // Remove the complete_task tool call from the final result.
+      // This condition is only hit if outputConfig is not set (subagent
+      // doesn't have structured response/json/schema).
+      if (submittedOutput === 'Task completed successfully.') {
+        finalResult = textResponse
+          .replace('```json\n{"name": "complete_task"}\n```', '')
+          .trim();
+      }
+
       return {
         status: 'stop',
         terminateReason: AgentTerminateMode.GOAL,
         finalResult,
       };
     }
+      
+    // debugLogger.log(
+    //   `[Executor] Next message: ${JSON.stringify(nextMessage, null, 2)}`,
+    // );
 
     // Task is not complete, continue to the next turn.
     return {
@@ -392,7 +424,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
         : 'Get Started!';
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
+      let currentMessage: GeminiContent = {
+        role: 'user',
+        parts: [{ text: query }],
+      };
 
       while (true) {
         // Check for termination conditions like max turns.
@@ -589,14 +624,33 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns The model's response, including any tool calls or text.
    */
   private async callModel(
+    chat: GeminiChat | OllamaChat,
+    message: GeminiContent,
+    tools: FunctionDeclaration[],
+    signal: AbortSignal,
+    promptId: string,
+  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    if (chat instanceof GeminiChat) {
+      return this.callGeminiModel(chat, message, tools, signal, promptId);
+    } else if (chat instanceof OllamaChat) {
+      return this.callOllamaModel(chat, message, tools, signal, promptId);
+    } else {
+      throw new Error('Unsupported chat object type');
+    }
+  }
+
+  /**
+   * Calls the Gemini model with the given message and tools.
+   */
+  private async callGeminiModel(
     chat: GeminiChat,
-    message: Content,
+    message: GeminiContent,
     tools: FunctionDeclaration[],
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
     const messageParams = {
-      message: message.parts || [],
+      message: (message.parts || []) as GeminiPart[],
       config: {
         abortSignal: signal,
         tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
@@ -621,21 +675,21 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // Extract and emit any subject "thought" content from the model.
         const { subject } = parseThought(
-          parts?.find((p) => p.thought)?.text || '',
+          parts?.find((p) => 'thought' in p && p.thought)?.text || '',
         );
         if (subject) {
           this.emitActivity('THOUGHT_CHUNK', { text: subject });
         }
 
         // Collect any function calls requested by the model.
-        if (chunk.functionCalls) {
+        if ('functionCalls' in chunk && chunk.functionCalls) {
           functionCalls.push(...chunk.functionCalls);
         }
 
         // Handle text response (non-thought text)
         const text =
           parts
-            ?.filter((p) => !p.thought && p.text)
+            ?.filter((p) => !('thought' in p && p.thought) && p.text)
             .map((p) => p.text)
             .join('') || '';
 
@@ -648,8 +702,224 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     return { functionCalls, textResponse };
   }
 
+  // TODO: test this.
+  /**
+   * Parses a string containing Ollama tool calls into an array of FunctionCall objects.
+   * @param text The string to parse.
+   * @returns An array of FunctionCall objects.
+   */
+  private _parseOllamaToolCalls(
+    text: string,
+    promptId: string,
+  ): FunctionCall[] {
+    const strippedText = stripJsonMarkdown(text);
+    // const strippedText = extractValidJson(text);
+    debugLogger.log(
+      `[Debug] Parsing Ollama tool calls from text: ${strippedText}`,
+    );
+    const functionCalls: FunctionCall[] = [];
+
+    try {
+      const parsedJson = JSON.parse(strippedText);
+
+      const processJsonToolCall = (
+        toolCall: unknown,
+        index: number,
+      ): FunctionCall | null => {
+        if (
+          typeof toolCall === 'object' &&
+          toolCall !== null &&
+          'name' in toolCall
+        ) {
+          const tc = toolCall as {
+            name: string;
+            parameters?: Record<string, unknown>;
+          };
+          if (typeof tc.name === 'string') {
+            return {
+              // id: `${promptId}-ollama-${index}`,
+              name: tc.name,
+              args: tc.parameters ?? {},
+            };
+          }
+        }
+        return null;
+      };
+
+      if (Array.isArray(parsedJson)) {
+        for (const [index, item] of parsedJson.entries()) {
+          const functionCall = processJsonToolCall(item, index);
+          if (functionCall) {
+            functionCalls.push(functionCall);
+          }
+        }
+      } else {
+        const functionCall = processJsonToolCall(parsedJson, 0);
+        if (functionCall) {
+          functionCalls.push(functionCall);
+        }
+      }
+
+      if (functionCalls.length > 0) {
+        debugLogger.log(
+          `[Debug] Parsed Ollama tool calls from JSON: ${JSON.stringify(
+            functionCalls,
+          )}`,
+        );
+        return functionCalls;
+      }
+    } catch (e) {
+      // Not a valid JSON, proceed with regex parsing
+      debugLogger.log(
+        '[Debug] Failed to parse tool calls as JSON, falling back to regex.',
+      );
+    }
+
+    // This regex finds patterns like `function_name(anything_inside)`.
+    const toolCallRegex = /(\w+)\((.*?)\)/g;
+    let match;
+
+    // The model might return tool calls wrapped in [].
+    const content =
+      strippedText.trim().startsWith('[') && strippedText.trim().endsWith(']')
+        ? strippedText.trim().slice(1, -1)
+        : strippedText.trim();
+
+    while ((match = toolCallRegex.exec(content)) !== null) {
+      const name = match[1];
+      const argsString = match[2];
+      debugLogger.log(
+        `[Debug] Found tool call: ${name} with args: ${argsString}`,
+      );
+      const args: { [key: string]: unknown } = {};
+
+      if (argsString) {
+        // This regex handles key-value pairs, including quoted values that may contain commas.
+        const argRegex = /(\w+)=(".*?"|'.*?'|[^,]+)/g;
+        let argMatch;
+        while ((argMatch = argRegex.exec(argsString)) !== null) {
+          const key = argMatch[1];
+          let value: unknown = argMatch[2].trim();
+
+          // Basic type inference
+          if (typeof value === 'string') {
+            if (
+              (value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith(`'`) && value.endsWith(`'`))
+            ) {
+              value = value.slice(1, -1);
+            } else if (!isNaN(Number(value)) && value.trim() !== '') {
+              value = Number(value);
+            } else if (value === 'true') {
+              value = true;
+            } else if (value === 'false') {
+              value = false;
+            }
+          }
+          args[key] = value;
+        }
+      }
+      functionCalls.push({
+        id: `${promptId}-ollama-${functionCalls.length}`,
+        name,
+        args,
+      });
+    }
+    debugLogger.log(
+      `[Debug] Parsed Ollama tool calls: ${JSON.stringify(functionCalls)}`,
+    );
+    return functionCalls;
+  }
+
+  /**
+   * Calls the Ollama model with the given message.
+   */
+  private async callOllamaModel(
+    chat: OllamaChat,
+    // TODO: later this should not take in a GeminiContent but a more generic type. it's fine for now since `currentMessage` is very basic.
+    // TODO: also handle conversion of toolResponseParts since that is the returned value from the `processFunctionCalls`: `nextMessage`.
+    message: GeminiContent,
+    tools: FunctionDeclaration[],
+    signal: AbortSignal,
+    promptId: string,
+  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const messageParams = {
+      message: (message.parts || []) as OllamaPart[],
+      config: {
+        tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
+      },
+    };
+
+    // debugLogger.log(
+    //   `[Debug] Sending message to Ollama model: ${JSON.stringify(messageParams, null, 2)}`,
+    // );
+
+    const responseStream = await chat.sendMessageStream(
+      this.definition.modelConfig.model,
+      messageParams,
+    );
+
+    let textResponse = '';
+
+    for await (const resp of responseStream) {
+      if (signal.aborted) break;
+
+      if (resp.type === StreamEventType.CHUNK) {
+        const chunk = resp.value;
+        const parts = chunk.candidates?.[0]?.content?.parts;
+
+        const text = parts?.map((p) => p.text).join('') || '';
+
+        // TODO: when I do this.emitActivity('THOUGHT_CHUNK', { text }); it updates the terminal to be the new chunk every time, but if I do this.emitActivity('THOUGHT_CHUNK', { textResponse }); then it doesn't update at all, even though I am verifying in the debuglogger.log that tht textresponse is updating properly? this is in executor.ts
+        if (text) {
+          // textResponse += text;
+          textResponse = text;
+          // For Ollama, we'll treat all output as a "thought" for now
+          // debugLogger.log(
+          //   '[Debug] Emitting thought chunk from Ollama response: ',
+          //   textResponse,
+          // );
+          // TODO: emitActivity only works if it's a const value.
+          this.emitActivity('THOUGHT_CHUNK', { text });
+
+          // this.emitActivity('THOUGHT_CHUNK', { textResponse });
+        }
+      }
+    }
+
+    let functionCalls = this._parseOllamaToolCalls(textResponse, promptId);
+
+    // If there is no function call, it implies complete_task call.
+    if (functionCalls.length === 0) {
+      debugLogger.log(
+        '[Debug] No function calls parsed from Ollama response, complete_task fallback.',
+      );
+      const outputName = this.definition.outputConfig?.outputName;
+      if (outputName) {
+        let args = {};
+        try {
+          // const strippedText = stripJsonMarkdown(textResponse);
+          args = { [outputName]: JSON.parse(textResponse) };
+          debugLogger.log(`[Debug] Subagent response is json.`);
+        } catch (error) {
+          args = { [outputName]: textResponse };
+          debugLogger.log(`[Debug] Subagent response is text.`);
+        }
+        const completeTaskFunctionCall: FunctionCall = {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args,
+          id: 'ollama-complete-task-fallback',
+        };
+        functionCalls = [completeTaskFunctionCall];
+      }
+    }
+    return { functionCalls, textResponse };
+  }
+
   /** Initializes a `GeminiChat` instance for the agent run. */
-  private async createChatObject(inputs: AgentInputs): Promise<GeminiChat> {
+  private async createChatObject(
+    inputs: AgentInputs,
+  ): Promise<GeminiChat | OllamaChat> {
     const { promptConfig, modelConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
@@ -668,34 +938,63 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       ? await this.buildSystemPrompt(inputs)
       : undefined;
 
-    try {
-      const generationConfig: GenerateContentConfig = {
-        temperature: modelConfig.temp,
-        topP: modelConfig.top_p,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget: modelConfig.thinkingBudget ?? -1,
-        },
+    await fs.writeFile(
+      `${this.definition.name}_prompt.txt`,
+      systemInstruction ?? '',
+    );
+    debugLogger.log(
+      `[DEBUG] System Instruction saved to ${this.definition.name}_prompt.txt`,
+    );
+
+    // debugLogger.log(
+    //   `[AgentExecutor] Created system instruction: ${systemInstruction}`,
+    // );
+
+    if ('host' in modelConfig) {
+      const populatedPromptConfig: PromptConfig = {
+        ...promptConfig,
+        systemPrompt: systemInstruction ?? '',
+        directive: this.definition.promptConfig.directive,
+        query: this.definition.promptConfig.query
+          ? templateString(this.definition.promptConfig.query, inputs)
+          : 'Get Started!',
       };
+      return new OllamaChat(
+        modelConfig as OllamaModelConfig,
+        systemInstruction,
+        startHistory,
+        populatedPromptConfig,
+      );
+    } else {
+      try {
+        const generationConfig: GenerateContentConfig = {
+          temperature: (modelConfig as ModelConfig).temp,
+          topP: (modelConfig as ModelConfig).top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: (modelConfig as ModelConfig).thinkingBudget ?? -1,
+          },
+        };
 
-      if (systemInstruction) {
-        generationConfig.systemInstruction = systemInstruction;
+        if (systemInstruction) {
+          generationConfig.systemInstruction = systemInstruction;
+        }
+
+        return new GeminiChat(
+          this.runtimeContext,
+          generationConfig,
+          startHistory,
+        );
+      } catch (error) {
+        await reportError(
+          error,
+          `Error initializing Gemini chat for agent ${this.definition.name}.`,
+          startHistory,
+          'startChat',
+        );
+        // Re-throw as a more specific error after reporting.
+        throw new Error(`Failed to create chat object: ${error}`);
       }
-
-      return new GeminiChat(
-        this.runtimeContext,
-        generationConfig,
-        startHistory,
-      );
-    } catch (error) {
-      await reportError(
-        error,
-        `Error initializing Gemini chat for agent ${this.definition.name}.`,
-        startHistory,
-        'startChat',
-      );
-      // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
     }
   }
 
@@ -709,11 +1008,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{
-    nextMessage: Content;
+    nextMessage: GeminiContent;
     submittedOutput: string | null;
     taskCompleted: boolean;
   }> {
+    debugLogger.log(
+      `[AgentExecutor] Processing ${functionCalls.length} function calls.`,
+    );
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
+    debugLogger.log(
+      `[AgentExecutor] Allowed tools for this agent: ${Array.from(
+        allowedToolNames,
+      ).join(', ')}`,
+    );
     // Always allow the completion tool
     allowedToolNames.add(TASK_COMPLETE_TOOL_NAME);
 
@@ -721,13 +1028,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let taskCompleted = false;
 
     // We'll collect promises for the tool executions
-    const toolExecutionPromises: Array<Promise<Part[] | void>> = [];
+    const toolExecutionPromises: Array<Promise<GeminiPart[] | void>> = [];
     // And we'll need a place to store the synchronous results (like complete_task or blocked calls)
-    const syncResponseParts: Part[] = [];
+    const syncResponseParts: GeminiPart[] = [];
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const args = (functionCall.args ?? {}) as Record<string, unknown>;
+      debugLogger.log(
+        `[AgentExecutor] Processing function call: ${functionCall.name} with ID: ${callId} and args: ${JSON.stringify(functionCall.args)}`,
+      );
 
       this.emitActivity('TOOL_CALL_START', {
         name: functionCall.name,
@@ -735,6 +1045,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       });
 
       if (functionCall.name === TASK_COMPLETE_TOOL_NAME) {
+        debugLogger.log('[AgentExecutor] Processing complete_task tool call.');
         if (taskCompleted) {
           // We already have a completion from this turn. Ignore subsequent ones.
           const error =
@@ -758,12 +1069,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         taskCompleted = true; // Signal completion regardless of output presence
 
         if (outputConfig) {
+          debugLogger.log(
+            '[AgentExecutor] Validating output for complete_task tool call.',
+          );
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
             const outputValue = args[outputName];
             const validationResult = outputConfig.schema.safeParse(outputValue);
 
             if (!validationResult.success) {
+              debugLogger.log(
+                '[AgentExecutor] Output validation failed:',
+                validationResult.error.flatten(),
+              );
               taskCompleted = false; // Validation failed, revoke completion
               const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
               syncResponseParts.push({
@@ -780,6 +1098,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
               });
               continue;
             }
+
+            debugLogger.log('[AgentExecutor] Output validation succeeded.');
 
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
@@ -819,6 +1139,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             });
           }
         } else {
+          debugLogger.log(
+            '[AgentExecutor] No output expected. Just signal completion.',
+          );
           // No output expected. Just signal completion.
           submittedOutput = 'Task completed successfully.';
           syncResponseParts.push({
@@ -865,15 +1188,44 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         name: functionCall.name as string,
         args,
         isClientInitiated: true,
+        isSubagent: true,
         prompt_id: promptId,
       };
 
       // Create a promise for the tool execution
+      debugLogger.log(
+        `[AgentExecutor] Scheduling execution for tool: ${functionCall.name} (ID: ${callId})`,
+      );
       const executionPromise = (async () => {
+        const outputUpdateHandler = (
+          toolCallId: string,
+          outputChunk: string | AnsiOutput,
+        ) => {
+          let text = '';
+          if (typeof outputChunk === 'string') {
+            text = outputChunk;
+          } else {
+            for (const line of outputChunk) {
+              for (const token of line) {
+                text += token.text;
+              }
+              text += '\n';
+            }
+          }
+          // debugLogger.log(
+          //   `[AgentExecutor] Tool output chunk from ${toolCallId}: ${text}`,
+          // );
+          this.emitActivity('TOOL_OUTPUT_CHUNK', {
+            toolCallId,
+            text,
+          });
+        };
+
         const { response: toolResponse } = await executeToolCall(
           this.runtimeContext,
           requestInfo,
           signal,
+          outputUpdateHandler,
         );
 
         if (toolResponse.error) {
@@ -899,7 +1251,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     const asyncResults = await Promise.all(toolExecutionPromises);
 
     // Combine all response parts
-    const toolResponseParts: Part[] = [...syncResponseParts];
+    const toolResponseParts: GeminiPart[] = [...syncResponseParts];
     for (const result of asyncResults) {
       if (result) {
         toolResponseParts.push(...result);
@@ -950,18 +1302,13 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       );
     }
 
-    // Always inject complete_task.
+    // Always inject complete_task if want gemma subagent to response in json format.
     // Configure its schema based on whether output is expected.
     const completeTool: FunctionDeclaration = {
       name: TASK_COMPLETE_TOOL_NAME,
       description: outputConfig
         ? 'Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.'
         : 'Call this tool to signal that you have completed your task. This is the ONLY way to finish.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {},
-        required: [],
-      },
     };
 
     if (outputConfig) {
@@ -971,11 +1318,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         definitions: _definitions,
         ...schema
       } = jsonSchema;
-      completeTool.parameters!.properties![outputConfig.outputName] =
-        schema as Schema;
-      completeTool.parameters!.required!.push(outputConfig.outputName);
+      completeTool.parameters = {
+        type: Type.OBJECT,
+        properties: {
+          [outputConfig.outputName]: schema as Schema,
+        },
+        required: [outputConfig.outputName],
+      };
     }
 
+    // Gemma subagent will response in fully formatted text instead of json.
     toolsList.push(completeTool);
 
     return toolsList;
@@ -988,8 +1340,68 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       return '';
     }
 
-    // Inject user inputs into the prompt template.
-    let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+    const templateInputs: Record<string, unknown> = { ...inputs };
+
+    if (promptConfig.directive) {
+      templateInputs['directive'] = promptConfig.directive;
+    }
+
+    if (promptConfig.systemPrompt.includes('${tool_code}')) {
+      const tools = this.prepareToolsList();
+      // Need the tool declaration to be of a certain format for gemma: https://ai.google.dev/gemma/docs/capabilities/function-calling#function-definition
+      const toolCode = `${JSON.stringify(
+        tools.map((tool) => {
+          type ToolWithBothParams = FunctionDeclaration & {
+            parametersJsonSchema?: unknown;
+          };
+          // Create a mutable copy of the tool to avoid modifying the original
+          const newTool: ToolWithBothParams = { ...tool };
+
+          // If 'parametersJsonSchema' exists, convert it to 'parameters'
+          if ('parametersJsonSchema' in newTool) {
+            newTool.parameters = newTool.parametersJsonSchema as Schema;
+            delete newTool.parametersJsonSchema;
+          }
+
+          // Process parameters to remove any parameter named 'description'
+          if (newTool.parameters && newTool.parameters.properties) {
+            const newProperties: Record<string, Schema> = {};
+            for (const propName in newTool.parameters.properties) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  newTool.parameters.properties,
+                  propName,
+                )
+              ) {
+                // Only include properties that are not named 'description'
+                if (propName !== 'description') {
+                  newProperties[propName] =
+                    newTool.parameters.properties[propName];
+                }
+              }
+            }
+            newTool.parameters = {
+              ...newTool.parameters,
+              properties: newProperties,
+            };
+
+            // Also update the 'required' array if 'description' was listed as required
+            if (newTool.parameters.required) {
+              newTool.parameters.required = newTool.parameters.required.filter(
+                (reqProp) => reqProp !== 'description',
+              );
+            }
+          }
+          return newTool;
+        }),
+        null,
+        2,
+      )}`;
+      templateInputs['tool_code'] = toolCode;
+    }
+
+    // Inject user inputs and tool code (if applicable) into the prompt template.
+    let finalPrompt = templateString(promptConfig.systemPrompt, templateInputs);
 
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.runtimeContext);
@@ -1003,9 +1415,9 @@ Important Rules:
 * Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
 
     finalPrompt += `
-* When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
-* Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
-* This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
+    * When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool.
+    * Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.
+    * This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
 
     return finalPrompt;
   }
@@ -1018,9 +1430,9 @@ Important Rules:
    * @returns A new array of `Content` with templated strings.
    */
   private applyTemplateToInitialMessages(
-    initialMessages: Content[],
+    initialMessages: GeminiContent[],
     inputs: AgentInputs,
-  ): Content[] {
+  ): GeminiContent[] {
     return initialMessages.map((content) => {
       const newParts = (content.parts ?? []).map((part) => {
         if ('text' in part && part.text !== undefined) {
@@ -1050,6 +1462,7 @@ Important Rules:
       GLOB_TOOL_NAME,
       READ_MANY_FILES_TOOL_NAME,
       MEMORY_TOOL_NAME,
+      SHELL_TOOL_NAME,
       WEB_SEARCH_TOOL_NAME,
     ]);
     for (const tool of toolRegistry.getAllTools()) {

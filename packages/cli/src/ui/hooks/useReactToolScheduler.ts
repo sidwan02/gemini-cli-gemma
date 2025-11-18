@@ -25,6 +25,7 @@ import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
+  SubagentHistoryItem,
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 
@@ -46,6 +47,7 @@ export type TrackedWaitingToolCall = WaitingToolCall & {
 export type TrackedExecutingToolCall = ExecutingToolCall & {
   responseSubmittedToGemini?: boolean;
   pid?: number;
+  subagentHistory?: SubagentHistoryItem[];
 };
 export type TrackedCompletedToolCall = CompletedToolCall & {
   responseSubmittedToGemini?: boolean;
@@ -99,6 +101,89 @@ export function useReactToolScheduler(
 
   const outputUpdateHandler: OutputUpdateHandler = useCallback(
     (toolCallId, outputChunk) => {
+      if (typeof outputChunk === 'string') {
+        const prefixes: Record<string, SubagentHistoryItem['type']> = {
+          'GEMINI_SUBAGENT_START::': 'start',
+          'GEMINI_SUBAGENT_THOUGHT::': 'thought',
+          'GEMINI_SUBAGENT_TOOL_CALL::': 'tool_call',
+          'GEMINI_SUBAGENT_TOOL_RESPONSE::': 'tool_response',
+          'GEMINI_SUBAGENT_TOOL_OUTPUT_CHUNK::': 'tool_output_chunk',
+          'GEMINI_SUBAGENT_ERROR::': 'error',
+        };
+
+        for (const prefix in prefixes) {
+          if (outputChunk.startsWith(prefix)) {
+            try {
+              const data = JSON.parse(outputChunk.substring(prefix.length));
+              const type = prefixes[prefix];
+
+              setToolCallsForDisplay((prevCalls) =>
+                prevCalls.map((tc) => {
+                  if (
+                    tc.request.callId === toolCallId &&
+                    tc.status === 'executing'
+                  ) {
+                    const executingTc = tc as TrackedExecutingToolCall;
+                    const newHistoryItem: SubagentHistoryItem = {
+                      type,
+                      data,
+                    };
+
+                    // debugLogger.log(
+                    //   `[useReactToolScheduler] Received subagent history item: ${JSON.stringify(
+                    //     newHistoryItem,
+                    //   )}`,
+                    // );
+
+                    const currentHistory = executingTc.subagentHistory || [];
+                    const lastHistoryItem =
+                      currentHistory.length > 0
+                        ? currentHistory[currentHistory.length - 1]
+                        : undefined;
+
+                    let newHistory: SubagentHistoryItem[];
+                    if (
+                      newHistoryItem.type === 'thought' &&
+                      lastHistoryItem?.type === 'thought'
+                    ) {
+                      // Replace the last thought with the new one
+                      newHistory = [
+                        ...currentHistory.slice(0, -1),
+                        newHistoryItem,
+                      ];
+                    } else if (
+                      newHistoryItem.type === 'tool_output_chunk' &&
+                      lastHistoryItem?.type === 'tool_output_chunk'
+                    ) {
+                      // Replace the last tool output chunk with the new one
+                      newHistory = [
+                        ...currentHistory.slice(0, -1),
+                        newHistoryItem,
+                      ];
+                      // debugLogger.log(
+                      //   `[useReactToolScheduler] Got tool_output_chunk with new history item: ${newHistoryItem.data.text}`,
+                      // );
+                    } else {
+                      // Append the new item
+                      newHistory = [...currentHistory, newHistoryItem];
+                    }
+
+                    return {
+                      ...executingTc,
+                      subagentHistory: newHistory,
+                    };
+                  }
+                  return tc;
+                }),
+              );
+              return; // Prefix matched, no further processing needed.
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (e) {
+              // Fall through to default behavior if JSON parsing fails.
+            }
+          }
+        }
+      }
       setToolCallsForDisplay((prevCalls) =>
         prevCalls.map((tc) => {
           if (tc.request.callId === toolCallId && tc.status === 'executing') {
@@ -141,6 +226,8 @@ export function useReactToolScheduler(
               responseSubmittedToGemini,
               liveOutput,
               pid: (coreTc as ExecutingToolCall).pid,
+              subagentHistory: (existingTrackedCall as TrackedExecutingToolCall)
+                ?.subagentHistory,
             };
           } else {
             return {
@@ -148,8 +235,19 @@ export function useReactToolScheduler(
               responseSubmittedToGemini,
             };
           }
-        });
-      });
+
+          // For other statuses, explicitly set liveOutput and pid to undefined
+          // to ensure they are not carried over from a previous executing state.
+          return {
+            ...coreTc,
+            responseSubmittedToGemini,
+            liveOutput: undefined,
+            pid: undefined,
+            subagentHistory: (existingTrackedCall as TrackedExecutingToolCall)
+              ?.subagentHistory,
+          };
+        }),
+      );
     },
     [setToolCallsForDisplay],
   );
@@ -313,15 +411,17 @@ export function mapToDisplay(
             resultDisplay: undefined,
             confirmationDetails: trackedCall.confirmationDetails,
           };
-        case 'executing':
+        case 'executing': {
+          const executingTc = trackedCall as TrackedExecutingToolCall;
           return {
             ...baseDisplayProperties,
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
-            resultDisplay:
-              (trackedCall as TrackedExecutingToolCall).liveOutput ?? undefined,
+            resultDisplay: executingTc.liveOutput ?? undefined,
             confirmationDetails: undefined,
-            ptyId: (trackedCall as TrackedExecutingToolCall).pid,
+            ptyId: executingTc.pid,
+            subagentHistory: executingTc.subagentHistory,
           };
+        }
         case 'validating': // Fallthrough
         case 'scheduled':
           return {

@@ -54,6 +54,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import * as fs from 'node:fs/promises';
 
 export function isThinkingSupported(model: string) {
   return (
@@ -199,6 +200,20 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      if (systemInstruction) {
+        try {
+          // Ensure fs/promises is imported at the top of the file:
+          // import * as fs from 'fs/promises';
+          await fs.writeFile('prompt.txt', systemInstruction);
+          console.log('[DEBUG] System Instruction saved to prompt.txt');
+        } catch (error) {
+          console.error(
+            '[DEBUG] Failed to save system instruction to prompt.txt:',
+            error,
+          );
+        }
+      }
+
       const model = this.config.getModel();
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
@@ -419,6 +434,7 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    // debugLogger.log(`Sending message stream ==============`);
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
@@ -512,6 +528,13 @@ export class GeminiClient {
     if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
+      // debuglogger.log(`Routing-------`);
+      // The router is not called every time sendMessageStream is invoked. It is called only once per "sequence" to determine the model to use. Once a model is
+      // selected and assigned to this.currentSequenceModel, that model is reused for subsequent calls within the same sequence, effectively "locking" the model for
+      // that sequence. The router is only invoked again if this.currentSequenceModel is null, which happens when a new sequence starts (e.g., this.lastPromptId
+      // changes or the client is reset).
+      // The "stickiness" of this.currentSequenceModel applies to subsequent turns within the same prompt sequence (e.g., when the model calls a tool and then
+      // continues, or when it decides to continue speaking on its own).
       const router = await this.config.getModelRouterService();
       const decision = await router.route(routingContext);
       modelToUse = decision.model;

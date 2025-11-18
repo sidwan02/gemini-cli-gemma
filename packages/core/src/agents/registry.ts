@@ -6,9 +6,12 @@
 
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
+import { GemmaAgent } from './gemma.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ModelConfig } from '../agents/types.js';
+import { BuildAndTestAgent } from './build-test-agent.js';
 
 /**
  * Manages the discovery, loading, validation, and registration of
@@ -35,6 +38,8 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const buildAndTestSettings = this.config.getBuildAndTestSettings();
+    const gemmaSubagentSettings = this.config.getGemmaSubagentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -45,9 +50,6 @@ export class AgentRegistry {
           model:
             investigatorSettings.model ??
             CodebaseInvestigatorAgent.modelConfig.model,
-          thinkingBudget:
-            investigatorSettings.thinkingBudget ??
-            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
         },
         runConfig: {
           ...CodebaseInvestigatorAgent.runConfig,
@@ -59,7 +61,36 @@ export class AgentRegistry {
             CodebaseInvestigatorAgent.runConfig.max_turns,
         },
       };
+
+      if (!('host' in agentDef.modelConfig)) {
+        agentDef.modelConfig.thinkingBudget =
+          investigatorSettings.thinkingBudget ??
+          (CodebaseInvestigatorAgent.modelConfig as ModelConfig).thinkingBudget;
+      }
       this.registerAgent(agentDef);
+    }
+
+    if (gemmaSubagentSettings?.enabled) {
+      const gemmaAgentDef = {
+        ...GemmaAgent,
+        modelConfig: {
+          ...GemmaAgent.modelConfig,
+          model: gemmaSubagentSettings.model ?? GemmaAgent.modelConfig.model,
+        },
+      };
+      this.registerAgent(gemmaAgentDef);
+    }
+
+    if (buildAndTestSettings?.enabled) {
+      const buildAndTestAgentDef = {
+        ...BuildAndTestAgent,
+        modelConfig: {
+          ...BuildAndTestAgent.modelConfig,
+          model:
+            buildAndTestSettings.model ?? BuildAndTestAgent.modelConfig.model,
+        },
+      };
+      this.registerAgent(buildAndTestAgentDef);
     }
   }
 

@@ -26,7 +26,7 @@ import {
 import { ApprovalMode } from '../policy/types.js';
 
 import { getErrorMessage } from '../utils/errors.js';
-import { summarizeToolOutput } from '../utils/summarizer.js';
+// import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
   ShellExecutionConfig,
   ShellOutputEvent,
@@ -41,10 +41,53 @@ import {
   isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
+
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+// import { debugLogger } from '../utils/debugLogger.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
+/**
+ * Cleans terminal output text by:
+ * 1. Replacing escaped newlines (`\n`) with actual newlines.
+ * 2. Removing all pipe characters (`│`).
+ * 3. Trimming leading/trailing whitespace from each line.
+ * 4. Collapsing all consecutive whitespace within each line into a single space.
+ *
+ * @param text The raw output string from the log.
+ * @returns The cleaned and formatted log text.
+ */
+function stripPtyFrame(text: string): string {
+  // Step 1: Replace the escaped newlines ('\n') with actual newlines ('\n').
+  // This correctly separates the log lines that are currently on the same string line.
+  let lines = text.replace(/\\n/g, '\n');
+
+  // Step 2: Split the text into individual lines and process them.
+  lines = lines
+    .split('\n')
+    .map((line) => {
+      // Remove the pipe character ('│').
+      let cleanedLine = line.replace(/│/g, '');
+
+      // Trim leading and trailing whitespace from the line.
+      // This removes the line-start padding and the large amount of padding spaces.
+      cleanedLine = cleanedLine.trim();
+
+      // Collapse all sequences of one or more whitespace characters (spaces, tabs, etc.)
+      // into a single space. This fulfills the request to "remove all the consecutive whitespaces"
+      // and is essential for cleaning up the huge padding columns in the middle.
+      cleanedLine = cleanedLine.replace(/\s+/g, ' ');
+
+      return cleanedLine;
+    })
+    // Step 3: Filter out any lines that became empty after trimming and processing.
+    .filter((line) => line.length > 0)
+    // Step 4: Join the clean lines back together with a proper newline character.
+    .join('\n');
+
+  return lines;
+}
 
 export interface ShellToolParams {
   command: string;
@@ -222,6 +265,98 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const result = await resultPromise;
 
+      // TODO: formatted output doesn't jitter.
+      //       result.output = `
+      //       > @google/gemini-cli@0.12.0-nightly.20251022.0542de95 test
+      // > npm run test --workspaces --if-present --parallel src/tools/glob.test.ts
+      // > @google/gemini-cli-a2a-server@0.12.0-nightly.20251022.0542de95 test
+      // > vitest run src/tools/glob.test.ts
+      // RUN v3.2.4 /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/a2a-server
+      // Coverage enabled with v8
+      // No test files found, exiting with code 1
+      // filter: src/tools/glob.test.ts
+      // include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+      // exclude: **/node_modules/**, **/dist/**
+      // JUNIT report written to /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/a2a-server/junit.xml
+      // % Coverage report from v8
+      // npm error Lifecycle script  failed with error:
+      // npm error code 1
+      // npm error path /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/a2a-server
+      // npm error workspace @google/gemini-cli-a2a-server@0.12.0-nightly.20251022.0542de95
+      // npm error location /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/a2a-server
+      // npm error command failed
+      // npm error command sh -c vitest run src/tools/glob.test.ts
+      // > @google/gemini-cli@0.12.0-nightly.20251022.0542de95 test
+      // > vitest run src/tools/glob.test.ts
+      // RUN v3.2.4 /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli
+      // Coverage enabled with v8
+      // No test files found, exiting with code 1
+      // filter: src/tools/glob.test.ts
+      // include: **/*.{test,spec}.?(c|m)[jt]s?(x), config.test.ts
+      // exclude: **/node_modules/**, **/dist/**, **/cypress/**
+      // JUNIT report written to /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli/junit.xml
+      // % Coverage report from v8
+      // npm error Lifecycle script  failed with error:
+      // npm error code 1
+      // npm error path /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli
+      // npm error workspace @google/gemini-cli@0.12.0-nightly.20251022.0542de95
+      // npm error location /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli
+      // npm error command failed
+      // npm error command sh -c vitest run src/tools/glob.test.ts
+      // > @google/gemini-cli-core@0.12.0-nightly.20251022.0542de95 test
+      // > vitest run src/tools/glob.test.ts
+      // RUN v3.2.4 /Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core
+      // Coverage enabled with v8
+      // (node:29205) MaxListenersExceededWarning: Possible EventTarget memory leak detected. 11 abort listeners added to [AbortSignal]. MaxListeners is 10.
+      // Use event
+      // s.setMaxListeners() to increase limit
+      // (Use  to show where the warning was created)
+      // ✓ src/tools/glob.test.ts (38 tests) 1794ms
+      // ✓ GlobTool > execute > should find files matching a simple pattern in the root 75ms
+      // ✓ GlobTool > execute > should find files case-sensitively when case_sensitive is true 56ms
+      // ✓ GlobTool > execute > should find files case-insensitively by default (pattern: *.TXT) 57ms
+      // ✓ GlobTool > execute > should find files case-insensitively when case_sensitive is false (pattern: *.TXT) 55ms
+      // ✓ GlobTool > execute > should find files using a pattern that includes a subdirectory 56ms
+      // ✓ GlobTool > execute > should find files in a specified relative path (relative to rootDir) 56ms
+      // ✓ GlobTool > execute > should find files using a deep globstar pattern (e.g., **/*.log) 58ms
+      // ✓ GlobTool > execute > should return "No files found" message when pattern matches nothing 56ms
+      // ✓ GlobTool > execute > should find files with special characters in the name 57ms
+      // ✓ GlobTool > execute > should find files with special characters like [] and () in the path 59ms
+      // ✓ GlobTool > execute > should correctly sort files by modification time (newest first) 59ms
+      // ✓ GlobTool > execute > should return a PATH_NOT_IN_WORKSPACE error if path is outside workspace 55ms
+      // ✓ GlobTool > execute > should return a GLOB_EXECUTION_ERROR on glob failure 59ms
+      // ✓ GlobTool > validateToolParams > should return null for valid parameters (pattern only) 56ms
+      // ✓ GlobTool > validateToolParams > should return null for valid parameters (pattern and path) 57ms
+      // ✓ GlobTool > validateToolParams > should return null for valid parameters (pattern, path, and case_sensitive) 55ms
+      // ✓ GlobTool > validateToolParams > should return error if pattern is missing (schema validation) 56ms
+      // ✓ GlobTool > validateToolParams > should return error if pattern is an empty string 56ms
+      // ✓ GlobTool > validateToolParams > should return error if pattern is only whitespace 56ms
+      // ✓ GlobTool > validateToolParams > should return error if path is provided but is not a string (schema validation) 57ms
+      // ✓ GlobTool > validateToolParams > should return error if case_sensitive is provided but is not a boolean (schema validation) 56ms
+      // ✓ GlobTool > validateToolParams > should return error if search path resolves outside the tool's root directory 56ms
+      // ✓ GlobTool > validateToolParams > should return error if specified search path does not exist 55ms
+      // ✓ GlobTool > validateToolParams > should return error if specified search path is a file, not a directory 56ms
+      // ✓ GlobTool > workspace boundary validation > should validate search paths are within workspace boundaries 56ms
+      // ✓ GlobTool > workspace boundary validation > should provide clear error messages when path is outside workspace 57ms
+      // ✓ GlobTool > workspace boundary validation > should work with paths in workspace subdirectories 56ms
+      // ✓ GlobTool > ignore file handling > should respect .gitignore files by default 61ms
+      // ✓ GlobTool > ignore file handling > should respect .geminiignore files by default 72ms
+      // ✓ GlobTool > ignore file handling > should not respect .gitignore when respect_git_ignore is false 58ms
+      // ✓ GlobTool > ignore file handling > should not respect .geminiignore when respect_gemini_ignore is false 57ms
+      // ✓ sortFileEntries > should sort a mix of recent and older files correctly 1ms
+      // ✓ sortFileEntries > should sort only recent files by mtime descending 0ms
+      // ✓ sortFileEntries > should sort only older files alphabetically by path 0ms
+      // ✓ sortFileEntries > should handle an empty array 0ms
+      // ✓ sortFileEntries > should correctly sort files when mtimes are identical for older files 0ms
+      // ✓ sortFileEntries > should correctly sort files when mtimes are identical for recent files (maintaining mtime sort) 0ms
+      //       `;
+
+      // debugLogger.log(`[Debug] ShellToolInvocation result: ${result.output}`);
+      result.output = stripPtyFrame(result.output);
+      // debugLogger.log(
+      //   `[Debug] ShellToolInvocation stripped output: ${result.output}`,
+      // );
+
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
         if (fs.existsSync(tempFilePath)) {
@@ -297,7 +432,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+      // const summarizeConfig = this.config.getSummarizeToolOutputConfig();
       const executionError = result.error
         ? {
             error: {
@@ -306,20 +441,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
             },
           }
         : {};
-      if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
-        const summary = await summarizeToolOutput(
-          this.config,
-          { model: 'summarizer-shell' },
-          llmContent,
-          this.config.getGeminiClient(),
-          signal,
-        );
-        return {
-          llmContent: summary,
-          returnDisplay: returnDisplayMessage,
-          ...executionError,
-        };
-      }
+//       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
+//         const summary = await summarizeToolOutput(
+//           this.config,
+//           { model: 'summarizer-shell' },
+//           llmContent,
+//           this.config.getGeminiClient(),
+//           signal,
+//         );
+//         return {
+//           llmContent: summary,
+//           returnDisplay: returnDisplayMessage,
+//           ...executionError,
+//         };
+//       }
 
       return {
         llmContent,

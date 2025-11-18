@@ -44,7 +44,12 @@ export type AgentInputs = Record<string, unknown>;
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;
-  type: 'TOOL_CALL_START' | 'TOOL_CALL_END' | 'THOUGHT_CHUNK' | 'ERROR';
+  type:
+    | 'TOOL_CALL_START'
+    | 'TOOL_CALL_END'
+    | 'THOUGHT_CHUNK'
+    | 'ERROR'
+    | 'TOOL_OUTPUT_CHUNK';
   data: Record<string, unknown>;
 }
 
@@ -58,7 +63,7 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
   displayName?: string;
   description: string;
   promptConfig: PromptConfig;
-  modelConfig: ModelConfig;
+  modelConfig: ModelConfig | OllamaModelConfig;
   runConfig: RunConfig;
   toolConfig?: ToolConfig;
   outputConfig?: OutputConfig<TOutput>;
@@ -85,6 +90,16 @@ export interface PromptConfig {
    * An array of user/model content pairs for few-shot prompting.
    */
   initialMessages?: Content[];
+
+  /**
+   * If the directive is provided here, it will be prepended to the last user prompt in every turn of the subaent's execution. This is needed since Gemma models often forget the system instruction when lots of context is provided in user responses.
+   */
+  directive?: string;
+
+  /**
+   * A reminder to be appended to the last user message.
+   */
+  reminder?: string;
 
   /**
    * The specific task or question to trigger the agent's execution loop.
@@ -156,6 +171,16 @@ export interface ModelConfig {
   temp: number;
   top_p: number;
   thinkingBudget?: number;
+}
+
+/**
+ * Configures the generative model parameters for an agent using Ollama.
+ */
+export interface OllamaModelConfig {
+  model: string;
+  host: string;
+  temp: number;
+  top_p: number;
 }
 
 /**

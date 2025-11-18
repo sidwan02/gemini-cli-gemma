@@ -1,0 +1,3 @@
+[submodule "litellm"]
+	path = litellm
+	url = https://github.com/sidwan02/litellm-gemini-cli

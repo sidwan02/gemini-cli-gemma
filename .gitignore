@@ -11,6 +11,7 @@
 .gemini/*
 !.gemini/config.yaml
 !.gemini/commands/
+!.gemini/settings.json
 
 # Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
 
@@ -55,3 +56,5 @@ gha-creds-*.json
 patch_output.log
 
 .genkit
+# prompt.txt
+# understand.md
