@@ -1,36 +1,11 @@
+assistant -----
+OK. The tests for `GlobTool` passed. The `gemini-cli-vscode-ide-compaion` test failed, but it seems unrelated to the user's request. Is there anything else I can help with?
 user -----
-This is the Gemini CLI. We are setting up the context for our chat.
-Today's date is Tuesday, November 18, 2025 (formatted according to the user's locale).
-My operating system is: darwin
-I'm currently working in the directory: /Users/siddharthdiwan/Desktop/gemini-cli-gemma. I have access to this directory and its subdirectories.
-
-Reminder: Do not return an empty response when a tool call is required.
-
-My setup is complete. I will provide my first command in the next turn.
+use the build and test tool: run npm build
 user -----
-Here is the user's editor context as a JSON object. This is for your information only.
-```json
-{
-  "activeFile": {
-    "path": "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/.gemini/settings.json",
-    "cursor": {
-      "line": 10,
-      "character": 29
-    }
-  },
-  "otherOpenFiles": [
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/cli/src/config/settings.ts",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/core/client.ts",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/understand.md",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/core/ollamaChat.ts",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/router.txt",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/.env",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/.gemini/config.yaml",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/utils/editCorrector.ts",
-    "/Users/siddharthdiwan/Desktop/gemini-cli-gemma/packages/core/src/utils/summarizer.ts"
-  ]
-}
-```
+use the build and test tool: npm run build
+assistant -----
+The build failed. It looks like there's an error in `src/agents/regiistry.ts` about unused imports. Would you like me to fix that?
 user -----
 
 You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between `flash` (SIMPLE) or `pro` (COMPLEX).
@@ -112,4 +87,4 @@ Remember! The JSON output MUST contain the fields "reasoning" and "model_choice"
 User request:
 
 
-use the build and test tool: test src/tools/glob.test.ts
+use the build and test tool: npm run test

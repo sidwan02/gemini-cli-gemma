@@ -19,7 +19,7 @@ import {
   resolveModel,
 } from '../../config/models.js';
 import {
-  type GenerateContentConfig,
+  // type GenerateContentConfig,
   createUserContent,
   Type,
   type Content as GeminiContent,
@@ -209,7 +209,7 @@ export class ClassifierStrategy implements RoutingStrategy {
           CLASSIFIER_SYSTEM_PROMPT,
         );
       } else {
-        const jsonResponse = await baseLlmClient.generateJson({
+        jsonResponse = await baseLlmClient.generateJson({
           modelConfigKey: { model: 'classifier' },
           contents: [...finalHistory, createUserContent(context.request)],
           schema: RESPONSE_SCHEMA,

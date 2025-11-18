@@ -58,3 +58,6 @@ patch_output.log
 .genkit
 # prompt.txt
 # understand.md
+
+
+*.txt

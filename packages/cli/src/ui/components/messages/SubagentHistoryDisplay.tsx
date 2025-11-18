@@ -74,51 +74,51 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
         break;
       // TODO: Shell tool output is very glitchy.
       // TODO: there's a bug when multiple shell tool calls are made in succession (for tool_output_chunk), they get merged into one response.
-      // case 'tool_response':
-      //   if (lastTurn.toolResponse) {
-      //     acc.push({ toolResponse: item });
-      //   } else {
-      //     lastTurn.toolResponse = item;
-      //   }
-      //   break;
-      // case 'tool_output_chunk':
-      //   // A tool output chunk should be associated with a tool call.
-      //   // Find the last turn with a tool call.
-      //   if (lastTurn.toolCall) {
-      //     if (lastTurn.toolResponse) {
-      //       // Append to existing toolResponse output
-      //       lastTurn.toolResponse.data.output =
-      //         ((lastTurn.toolResponse.data.output as string) || '') +
-      //         item.data.text;
-      //     } else {
-      //       // First chunk, create the toolResponse
-      //       lastTurn.toolResponse = {
-      //         type: 'tool_response',
-      //         data: {
-      //           name: lastTurn.toolCall.data.name, // Use name from toolCall
-      //           output: item.data.text,
-      //         },
-      //       };
-      //     }
-      //   } else {
-      //     // This case is unexpected. A tool_output_chunk should follow a tool_call.
-      //     // We could log an error here. For now, we can try to handle it gracefully
-      //     // by creating a new turn, but this indicates a logic issue elsewhere.
-      //     // debugLogger.error(
-      //     //   `[SubagentHistoryDisplay] Received TOOL_OUTPUT_CHUNK without a preceding TOOL_CALL.`,
-      //     // );
-      //     // To avoid crashing, we can create a new turn, but this is not ideal.
-      //     acc.push({
-      //       toolResponse: {
-      //         type: 'tool_response',
-      //         data: {
-      //           name: '', // We don't know the name
-      //           output: item.data.text,
-      //         },
-      //       },
-      //     });
-      //   }
-      //   break;
+      case 'tool_response':
+        if (lastTurn.toolResponse) {
+          acc.push({ toolResponse: item });
+        } else {
+          lastTurn.toolResponse = item;
+        }
+        break;
+      case 'tool_output_chunk':
+        // A tool output chunk should be associated with a tool call.
+        // Find the last turn with a tool call.
+        if (lastTurn.toolCall) {
+          if (lastTurn.toolResponse) {
+            // Append to existing toolResponse output
+            lastTurn.toolResponse.data.output =
+              ((lastTurn.toolResponse.data.output as string) || '') +
+              item.data.text;
+          } else {
+            // First chunk, create the toolResponse
+            lastTurn.toolResponse = {
+              type: 'tool_response',
+              data: {
+                name: lastTurn.toolCall.data.name, // Use name from toolCall
+                output: item.data.text,
+              },
+            };
+          }
+        } else {
+          // This case is unexpected. A tool_output_chunk should follow a tool_call.
+          // We could log an error here. For now, we can try to handle it gracefully
+          // by creating a new turn, but this indicates a logic issue elsewhere.
+          // debugLogger.error(
+          //   `[SubagentHistoryDisplay] Received TOOL_OUTPUT_CHUNK without a preceding TOOL_CALL.`,
+          // );
+          // To avoid crashing, we can create a new turn, but this is not ideal.
+          acc.push({
+            toolResponse: {
+              type: 'tool_response',
+              data: {
+                name: '', // We don't know the name
+                output: item.data.text,
+              },
+            },
+          });
+        }
+        break;
       default:
         // debugLogger.error(`[SubagentHistoryDisplay] Unknown item type.`);
         break;

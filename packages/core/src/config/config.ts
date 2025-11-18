@@ -544,7 +544,7 @@ export class Config {
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
-    this.initialUseModelRouter = params.useModelRouter ?? false;
+    this.initialUseModelRouter = params.useModelRouter?.enabled ?? false;
     this.useModelRouter = {
       enabled: params.useModelRouter?.enabled ?? false,
       useGemmaRouting: {
@@ -690,9 +690,9 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
-    this.useModelRouter = this.initialUseModelRouter;
+    this.useModelRouter.enabled = this.initialUseModelRouter;
     if (this.disableModelRouterForAuth?.includes(authMethod)) {
-      this.useModelRouter = false;
+      this.useModelRouter.enabled = false;
       if (this.model === DEFAULT_GEMINI_MODEL_AUTO) {
         this.model = DEFAULT_GEMINI_MODEL;
       }
@@ -1530,14 +1530,12 @@ export class Config {
       const definition = this.agentRegistry.getDefinition('gemma_agent');
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
-        const excludeTools = this.getExcludeTools() || [];
         const allowedTools = this.getAllowedTools();
 
-        const isExcluded = excludeTools.includes(definition.name);
         const isAllowed =
           !allowedTools || allowedTools.includes(definition.name);
 
-        if (isAllowed && !isExcluded) {
+        if (isAllowed) {
           const messageBusEnabled = this.getEnableMessageBusIntegration();
           const wrapper = new SubagentToolWrapper(
             definition,
@@ -1554,14 +1552,12 @@ export class Config {
       );
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
-        const excludeTools = this.getExcludeTools() || [];
         const allowedTools = this.getAllowedTools();
 
-        const isExcluded = excludeTools.includes(definition.name);
         const isAllowed =
           !allowedTools || allowedTools.includes(definition.name);
 
-        if (isAllowed && !isExcluded) {
+        if (isAllowed) {
           const messageBusEnabled = this.getEnableMessageBusIntegration();
           const wrapper = new SubagentToolWrapper(
             definition,

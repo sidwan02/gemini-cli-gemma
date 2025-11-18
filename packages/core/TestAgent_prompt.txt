@@ -1,4 +1,4 @@
-Achieve the goal: Abort test.
+Achieve the goal: Compress reset.
 
 # Environment Context
 Mocked Environment Context

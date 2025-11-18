@@ -233,21 +233,12 @@ export function useReactToolScheduler(
             return {
               ...coreTc,
               responseSubmittedToGemini,
+              // subagentHistory: (existingTrackedCall as TrackedExecutingToolCall)
+              //   ?.subagentHistory,
             };
           }
-
-          // For other statuses, explicitly set liveOutput and pid to undefined
-          // to ensure they are not carried over from a previous executing state.
-          return {
-            ...coreTc,
-            responseSubmittedToGemini,
-            liveOutput: undefined,
-            pid: undefined,
-            subagentHistory: (existingTrackedCall as TrackedExecutingToolCall)
-              ?.subagentHistory,
-          };
-        }),
-      );
+        });
+      });
     },
     [setToolCallsForDisplay],
   );

@@ -76,7 +76,7 @@ const GRACE_PERIOD_MS = 60 * 1000; // 1 min
 type AgentTurnResult =
   | {
       status: 'continue';
-      nextMessage: Content;
+      nextMessage: GeminiContent;
     }
   | {
       status: 'stop';
@@ -192,25 +192,26 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * or stop the agent loop.
    */
   private async executeTurn(
-    chat: GeminiChat,
-    currentMessage: Content,
+    chat: GeminiChat | OllamaChat,
+    currentMessage: GeminiContent,
     tools: FunctionDeclaration[],
     turnCounter: number,
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
-      
-    
+
     debugLogger.log('Prompt ID: ' + promptId);
 
-    await this.tryCompressChat(chat, promptId);
+    if (chat instanceof GeminiChat) {
+      await this.tryCompressChat(chat, promptId);
+    }
 
     // The textResponse is not deconstructed from callModel, but it's used to emit/yield thoughts and streamed chunks to the UI.
     const { functionCalls, textResponse } = await promptIdContext.run(
       promptId,
       async () =>
-        this.callModel(chat, currentMessage, tools, signal, promptId),
+        this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -241,7 +242,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
 
     if (taskCompleted) {
-      const finalResult = submittedOutput ?? 'Task completed successfully.';
+      let finalResult = submittedOutput ?? 'Task completed successfully.';
 
       // Remove the complete_task tool call from the final result.
       // This condition is only hit if outputConfig is not set (subagent
@@ -258,7 +259,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         finalResult,
       };
     }
-      
+
     // debugLogger.log(
     //   `[Executor] Next message: ${JSON.stringify(nextMessage, null, 2)}`,
     // );
@@ -303,7 +304,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns The final result string if recovery was successful, or `null` if it failed.
    */
   private async executeFinalWarningTurn(
-    chat: GeminiChat,
+    chat: GeminiChat | OllamaChat,
     tools: FunctionDeclaration[],
     turnCounter: number,
     reason:
@@ -327,7 +328,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     );
 
     try {
-      const recoveryMessage: Content = {
+      const recoveryMessage: GeminiContent = {
         role: 'user',
         parts: [{ text: this.getFinalWarningMessage(reason) }],
       };
@@ -416,7 +417,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       new AgentStartEvent(this.agentId, this.definition.name),
     );
 
-    let chat: GeminiChat | undefined;
+    let chat: GeminiChat | OllamaChat | undefined;
     let tools: FunctionDeclaration[] | undefined;
     try {
       chat = await this.createChatObject(inputs);

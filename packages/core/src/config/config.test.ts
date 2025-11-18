@@ -753,7 +753,7 @@ describe('Server Config (config.ts)', () => {
     it('should disable model router by default for oauth-personal', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
       });
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(true);
@@ -762,7 +762,7 @@ describe('Server Config (config.ts)', () => {
     it('should enable model router by default for other auth types', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
       });
       await config.refreshAuth(AuthType.USE_GEMINI);
       expect(config.getUseModelRouter()).toBe(true);
@@ -771,7 +771,7 @@ describe('Server Config (config.ts)', () => {
     it('should disable model router for specified auth type', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
         disableModelRouterForAuth: [AuthType.USE_GEMINI],
       });
       await config.refreshAuth(AuthType.USE_GEMINI);
@@ -801,7 +801,7 @@ describe('Server Config (config.ts)', () => {
     it('should keep the user-chosen model after refreshAuth, even when model router is disabled for the auth type', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
         disableModelRouterForAuth: [AuthType.USE_GEMINI],
       });
       const chosenModel = 'gemini-1.5-pro-latest';
@@ -816,7 +816,7 @@ describe('Server Config (config.ts)', () => {
     it('should keep the user-chosen model after refreshAuth, when model router is enabled for the auth type', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
         disableModelRouterForAuth: [AuthType.USE_GEMINI],
       });
       const chosenModel = 'gemini-1.5-pro-latest';
@@ -831,7 +831,7 @@ describe('Server Config (config.ts)', () => {
     it('should NOT switch to auto model if cli provides specific model, even if router is enabled', async () => {
       const config = new Config({
         ...baseParams,
-        useModelRouter: true,
+        useModelRouter: { enabled: true },
         model: 'gemini-flash-latest',
       });
 
