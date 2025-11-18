@@ -8,7 +8,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type {
   IndividualToolCallDisplay,
-  SubagentHistoryItem,
+  SubagentHistoryItem, // ADDED
 } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
@@ -16,7 +16,8 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-// import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { StickyHeader } from '../StickyHeader.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -24,10 +25,9 @@ import {
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
-// import type { Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
-import { SubagentHistoryDisplay } from './SubagentHistoryDisplay.js';
-// import { debugLogger } from '@google/gemini-cli-core';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { SubagentHistoryDisplay } from './SubagentHistoryDisplay.js'; // ADDED
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -46,8 +46,11 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   renderOutputAsMarkdown?: boolean;
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
+  isFirst: boolean;
+  borderColor: string;
+  borderDimColor: boolean;
   config?: Config;
-  subagentHistory?: SubagentHistoryItem[];
+  subagentHistory?: SubagentHistoryItem[]; // ADDED
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -63,9 +66,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   embeddedShellFocused,
   ptyId,
   config,
-  subagentHistory,
+  isFirst,
+  borderColor,
+  borderDimColor,
+  subagentHistory, // ADDED
 }) => {
   const { renderMarkdown } = useUIState();
+  const isAlternateBuffer = useAlternateBuffer();
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
@@ -116,32 +123,95 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     : undefined;
 
   // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // we're forcing it to not render as markdown when the response is too long, it will fallback
+  // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
   // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight) {
+  if (availableHeight && !isAlternateBuffer) {
     renderOutputAsMarkdown = false;
   }
+  const combinedPaddingAndBorderWidth = 4;
+  const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
-  const childWidth = terminalWidth - 3; // account for padding.
-  if (typeof resultDisplay === 'string') {
-    if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-      // Truncate the result display to fit within the available width.
-      resultDisplay =
-        '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+  const truncatedResultDisplay = React.useMemo(() => {
+    if (typeof resultDisplay === 'string') {
+      if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
+        return '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+      }
     }
-  }
+    return resultDisplay;
+  }, [resultDisplay]);
 
-  // debugLogger.log(
-  //   `[ToolMessage] Rendering tool message for tool '${name}' with status '${status}' with subagentHistory latest message: ${
-  //     subagentHistory && subagentHistory.length > 0
-  //       ? JSON.stringify(subagentHistory[subagentHistory.length - 1].data)
-  //       : 'N/A'
-  //   }`,
-  // );
+  const renderedResult = React.useMemo(() => {
+    if (!truncatedResultDisplay) return null;
+
+    return (
+      <Box width={childWidth} flexDirection="column">
+        <Box flexDirection="column">
+          {typeof truncatedResultDisplay === 'string' &&
+          renderOutputAsMarkdown ? (
+            <Box flexDirection="column">
+              <MarkdownDisplay
+                text={truncatedResultDisplay}
+                terminalWidth={childWidth}
+                renderMarkdown={renderMarkdown}
+                isPending={false}
+              />
+            </Box>
+          ) : typeof truncatedResultDisplay === 'string' &&
+            !renderOutputAsMarkdown ? (
+            isAlternateBuffer ? (
+              <Box flexDirection="column" width={childWidth}>
+                <Text wrap="wrap" color={theme.text.primary}>
+                  {truncatedResultDisplay}
+                </Text>
+              </Box>
+            ) : (
+              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+                <Box>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {truncatedResultDisplay}
+                  </Text>
+                </Box>
+              </MaxSizedBox>
+            )
+          ) : typeof truncatedResultDisplay === 'object' &&
+            'fileDiff' in truncatedResultDisplay ? (
+            <DiffRenderer
+              diffContent={truncatedResultDisplay.fileDiff}
+              filename={truncatedResultDisplay.fileName}
+              availableTerminalHeight={availableHeight}
+              terminalWidth={childWidth}
+            />
+          ) : typeof truncatedResultDisplay === 'object' &&
+            'todos' in truncatedResultDisplay ? (
+            // display nothing, as the TodoTray will handle rendering todos
+            <></>
+          ) : (
+            <AnsiOutputText
+              data={truncatedResultDisplay as AnsiOutput}
+              availableTerminalHeight={availableHeight}
+              width={childWidth}
+            />
+          )}
+        </Box>
+      </Box>
+    );
+  }, [
+    truncatedResultDisplay,
+    renderOutputAsMarkdown,
+    childWidth,
+    renderMarkdown,
+    isAlternateBuffer,
+    availableHeight,
+  ]);
 
   return (
-    <Box paddingX={1} paddingY={0} flexDirection="column">
-      <Box minHeight={1}>
+    <>
+      <StickyHeader
+        width={terminalWidth}
+        isFirst={isFirst}
+        borderColor={borderColor}
+        borderDimColor={borderDimColor}
+      >
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}
@@ -157,65 +227,45 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           </Box>
         )}
         {emphasis === 'high' && <TrailingIndicator />}
-      </Box>
-      {subagentHistory ? (
-        <Box
-          borderStyle="round"
-          borderColor={theme.border.default}
-          paddingX={1}
-          marginTop={1}
-        >
-          <SubagentHistoryDisplay
-            history={subagentHistory}
-            terminalWidth={terminalWidth - 2} // Account for padding
-          />
-        </Box>
-      ) : resultDisplay ? (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
-          <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
-              <Box flexDirection="column">
-                <MarkdownDisplay
-                  text={resultDisplay}
-                  isPending={false}
-                  availableTerminalHeight={availableHeight}
-                  terminalWidth={childWidth}
-                  renderMarkdown={renderMarkdown}
-                />
-              </Box>
-            ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
-                <Box>
-                  <Text wrap="wrap" color={theme.text.primary}>
-                    {resultDisplay}
-                  </Text>
-                </Box>
-              </MaxSizedBox>
-            ) : typeof resultDisplay === 'object' &&
-              'fileDiff' in resultDisplay ? (
-              <DiffRenderer
-                diffContent={resultDisplay.fileDiff}
-                filename={resultDisplay.fileName}
-                availableTerminalHeight={availableHeight}
-                terminalWidth={childWidth}
-              />
-            ) : typeof resultDisplay === 'object' &&
-              'todos' in resultDisplay ? (
-              // display nothing, as the TodoTray will handle rendering todos
-              <></>
-            ) : (
-              <AnsiOutputText
-                data={resultDisplay as AnsiOutput}
-                availableTerminalHeight={availableHeight}
-                width={childWidth}
-              />
-            )}
+      </StickyHeader>
+      <Box
+        width={terminalWidth}
+        borderStyle="round"
+        borderColor={borderColor}
+        borderDimColor={borderDimColor}
+        borderTop={false}
+        borderBottom={false}
+        borderLeft={true}
+        borderRight={true}
+        paddingX={1}
+        flexDirection="column"
+      >
+        {subagentHistory ? ( // START OF MERGED LOGIC
+          <Box
+            borderStyle="round"
+            borderColor={theme.border.default}
+            paddingX={1}
+            marginTop={1}
+          >
+            <SubagentHistoryDisplay
+              history={subagentHistory}
+              terminalWidth={terminalWidth - 2} // terminalWidth - 2 (left/right padding of ToolMessage's root Box in the old structure)
+            />
           </Box>
-        </Box>
-      ) : (
-        <></>
-      )}
-    </Box>
+        ) : (
+          renderedResult && <Box marginTop={1}>{renderedResult}</Box>
+        )}
+
+        {isThisShellFocused && config && (
+          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+            <ShellInputPrompt
+              activeShellPtyId={activeShellPtyId ?? null}
+              focus={embeddedShellFocused}
+            />
+          </Box>
+        )}
+      </Box>
+    </>
   );
 };
 
@@ -293,11 +343,8 @@ const ToolInfo: React.FC<ToolInfo> = ({
     }
   }, [emphasis]);
   return (
-    <Box>
-      <Text
-        wrap="truncate-end"
-        strikethrough={status === ToolCallStatus.Canceled}
-      >
+    <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
+      <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}

@@ -23,6 +23,8 @@ export enum AuthState {
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
+  // Waiting for user to input API key
+  AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
 }
@@ -80,6 +82,11 @@ export interface CompressionProps {
   compressionStatus: CompressionStatus | null;
 }
 
+/**
+ * For use when you want no icon.
+ */
+export const emptyIcon = '  ';
+
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
 }
@@ -102,6 +109,8 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  icon?: string;
+  color?: string;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -141,6 +150,11 @@ export type HistoryItemModelStats = HistoryItemBase & {
 
 export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
+};
+
+export type HistoryItemModel = HistoryItemBase & {
+  type: 'model';
+  model: string;
 };
 
 export type HistoryItemQuit = HistoryItemBase & {
@@ -242,6 +256,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
   | HistoryItemExtensionsList
