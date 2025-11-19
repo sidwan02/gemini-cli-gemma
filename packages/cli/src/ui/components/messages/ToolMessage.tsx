@@ -15,7 +15,7 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
-import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+// import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import {
@@ -165,13 +165,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 </Text>
               </Box>
             ) : (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
-                <Box>
-                  <Text wrap="wrap" color={theme.text.primary}>
-                    {truncatedResultDisplay}
-                  </Text>
-                </Box>
-              </MaxSizedBox>
+              <Box>
+                <Text wrap="wrap" color={theme.text.primary}>
+                  {truncatedResultDisplay}
+                </Text>
+              </Box>
             )
           ) : typeof truncatedResultDisplay === 'object' &&
             'fileDiff' in truncatedResultDisplay ? (

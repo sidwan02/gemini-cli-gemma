@@ -61,14 +61,10 @@ export const SubagentToolCallDisplay: React.FC<
       </Box>
       {toolResponse && typeof toolResponse.data.output === 'string' && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
-          <Box flexDirection="column">
-            {toolResponse.data.output.split('\n').map((line, index) => (
-              <Box key={index}>
-                <Text wrap="wrap" color={theme.text.primary}>
-                  {line}
-                </Text>
-              </Box>
-            ))}
+          <Box>
+            <Text wrap="wrap" color={theme.text.primary}>
+              {toolResponse.data.output}
+            </Text>
           </Box>
         </Box>
       )}
