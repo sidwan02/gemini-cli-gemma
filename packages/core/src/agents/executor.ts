@@ -215,6 +215,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     );
 
     if (combinedSignal.aborted) {
+      debugLogger.log(
+        '[Debug] Combined signal aborted, stopping agent execution.',
+      );
       const terminateReason = timeoutSignal.aborted
         ? AgentTerminateMode.TIMEOUT
         : AgentTerminateMode.ABORTED;
@@ -410,7 +413,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     );
 
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    let combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+
+    let abortedOnce = false;
 
     logAgentStart(
       this.runtimeContext,
@@ -438,15 +443,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           break;
         }
 
-        // Check for timeout or external abort.
-        if (combinedSignal.aborted) {
-          // Determine which signal caused the abort.
-          terminateReason = timeoutController.signal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-          break;
-        }
-
         const turnResult = await this.executeTurn(
           chat,
           currentMessage,
@@ -458,15 +454,40 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (turnResult.status === 'stop') {
           terminateReason = turnResult.terminateReason;
+
+          // On the first abort, send the user's message back into the loop.
+          if (terminateReason === AgentTerminateMode.ABORTED && !abortedOnce) {
+            debugLogger.log(`[AgentExecutor] First time user aborted.`);
+            abortedOnce = true;
+            currentMessage = {
+              role: 'user',
+              parts: [
+                {
+                  text: 'The user has aborted the request. Acknowledge this and ask if they would like to try an alternative approach.',
+                },
+              ],
+            };
+
+            // Reset the combined signal to allow the next turn to execute.
+            // A second user abort will be treated as a final termination.
+            combinedSignal = AbortSignal.any([
+              signal,
+              timeoutController.signal,
+            ]);
+
+            // Now we continue to the next loop iteration...
+            continue;
+          }
+
           // Only set finalResult if the turn provided one (e.g., error or goal).
           if (turnResult.finalResult) {
             finalResult = turnResult.finalResult;
           }
-          break; // Exit the loop for *any* stop reason.
+          break; // Exit the loop for *any* other stop reason.
+        } else {
+          // If status is 'continue', update message for the next loop
+          currentMessage = turnResult.nextMessage;
         }
-
-        // If status is 'continue', update message for the next loop
-        currentMessage = turnResult.nextMessage;
       }
 
       // === UNIFIED RECOVERY BLOCK ===
@@ -525,6 +546,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           terminate_reason: terminateReason,
         };
       }
+
+      debugLogger.log(
+        `[AgentExecutor] Final termination reason: ${terminateReason}`,
+      );
 
       return {
         result:
@@ -863,7 +888,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let textResponse = '';
 
     for await (const resp of responseStream) {
-      if (signal.aborted) break;
+      if (signal.aborted) {
+        debugLogger.log(
+          '[Debug] Signal aborted, breaking Ollama response stream.',
+        );
+        break;
+      }
 
       if (resp.type === StreamEventType.CHUNK) {
         const chunk = resp.value;

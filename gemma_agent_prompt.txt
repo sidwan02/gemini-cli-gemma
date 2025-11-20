@@ -8,13 +8,13 @@ You have access to these tools:
   {
     "name": "glob",
     "description": "Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
-    "parametersJsonSchema": {
+    "parameters": {
       "properties": {
         "pattern": {
           "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md', '**/*search*').",
           "type": "string"
         },
-        "path": {
+        "dir_path": {
           "description": "Optional: The absolute path to the directory to search within. Defaults to the current working directory (root).",
           "type": "string"
         },
@@ -40,10 +40,10 @@ You have access to these tools:
   {
     "name": "read_file",
     "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
-    "parametersJsonSchema": {
+    "parameters": {
       "properties": {
-        "absolute_path": {
-          "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+        "file_path": {
+          "description": "The path to the file to read.",
           "type": "string"
         },
         "offset": {
@@ -56,7 +56,7 @@ You have access to these tools:
         }
       },
       "required": [
-        "absolute_path"
+        "file_path"
       ],
       "type": "object"
     }

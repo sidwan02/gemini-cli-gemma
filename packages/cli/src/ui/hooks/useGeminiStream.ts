@@ -853,6 +853,12 @@ export const useGeminiStream = (
             config.setQuotaErrorOccurred(false);
           }
 
+          // TODO: this is where the abort controller is set.
+          // TODO: figure out if a new abort controller is set every time there is a new query? or every time there is an abort? what even is a continuation?
+          // Current issue is that tool calls can only access a single read-only signal, so they (I think) will never know if control c is pressed multiple times (they'll only see the first abort signal).
+          // Best is for the subagent to be defining the abort controller for its own operations.
+          //      2. Loss of external control: If executor.ts were to create its own AbortController on each loop iteration, the cancelOngoingRequest function in useGeminiStream.ts would lose its ability to directly abort the agent after the first turn. useGeminiStream.ts would be aborting an AbortController
+          // that executor.ts is no longer actively listening to, effectively breaking the user's ability to trigger a second abort.
           abortControllerRef.current = new AbortController();
           const abortSignal = abortControllerRef.current.signal;
           turnCancelledRef.current = false;
