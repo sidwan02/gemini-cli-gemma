@@ -65,6 +65,11 @@ import type { Part as OllamaPart } from '../core/ollamaChat.js';
 import { stripJsonMarkdown } from '../utils/json.js';
 import * as fs from 'node:fs/promises';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import {
+  signalManager,
+  SINGLE_INTERRUPT,
+  DOUBLE_INTERRUPT,
+} from '../common/abort-signal-manager.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -196,7 +201,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     currentMessage: GeminiContent,
     tools: FunctionDeclaration[],
     turnCounter: number,
-    combinedSignal: AbortSignal,
+    turnSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
@@ -211,16 +216,34 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     const { functionCalls, textResponse } = await promptIdContext.run(
       promptId,
       async () =>
-        this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
+        this.callModel(chat, currentMessage, tools, turnSignal, promptId),
     );
 
-    if (combinedSignal.aborted) {
+    if (turnSignal.aborted) {
       debugLogger.log(
-        '[Debug] Combined signal aborted, stopping agent execution.',
+        `[Debug] Combined signal aborted (reason: ${turnSignal.reason}), stopping agent execution.`,
       );
-      const terminateReason = timeoutSignal.aborted
-        ? AgentTerminateMode.TIMEOUT
-        : AgentTerminateMode.ABORTED;
+      if (turnSignal.reason === SINGLE_INTERRUPT) {
+        return {
+          status: 'continue',
+          nextMessage: {
+            role: 'user',
+            parts: [
+              {
+                text: 'User has interrupted. Acknowledge this and ask if they would like to try an alternative approach.',
+              },
+            ],
+          },
+        };
+      }
+
+      const terminateReason =
+        turnSignal.reason === DOUBLE_INTERRUPT
+          ? AgentTerminateMode.ABORTED
+          : timeoutSignal.aborted
+            ? AgentTerminateMode.TIMEOUT
+            : AgentTerminateMode.ABORTED;
+
       return {
         status: 'stop',
         terminateReason,
@@ -242,7 +265,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const { nextMessage, submittedOutput, taskCompleted } =
-      await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
+      await this.processFunctionCalls(functionCalls, turnSignal, promptId);
 
     if (taskCompleted) {
       let finalResult = submittedOutput ?? 'Task completed successfully.';
@@ -314,7 +337,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       | AgentTerminateMode.TIMEOUT
       | AgentTerminateMode.MAX_TURNS
       | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
-    externalSignal: AbortSignal, // The original signal passed to run()
+    turnSignal: AbortSignal,
   ): Promise<string | null> {
     this.emitActivity('THOUGHT_CHUNK', {
       text: `Execution limit reached (${reason}). Attempting one final recovery turn with a grace period.`,
@@ -338,7 +361,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // We monitor both the external signal and our new grace period timeout
       const combinedSignal = AbortSignal.any([
-        externalSignal,
+        turnSignal,
         graceTimeoutController.signal,
       ]);
 
@@ -412,11 +435,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       max_time_minutes * 60 * 1000,
     );
 
-    // Combine the external signal with the internal timeout signal.
-    let combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
-
-    let abortedOnce = false;
-
     logAgentStart(
       this.runtimeContext,
       new AgentStartEvent(this.agentId, this.definition.name),
@@ -425,6 +443,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let chat: GeminiChat | OllamaChat | undefined;
     let tools: FunctionDeclaration[] | undefined;
     try {
+      signalManager.startAgentSession();
       chat = await this.createChatObject(inputs);
       tools = this.prepareToolsList();
       const query = this.definition.promptConfig.query
@@ -436,6 +455,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       while (true) {
+        // Get the current signal for this turn. It might have been reset.
+        const turnAbortController = new AbortController();
+        signalManager.setCurrentTurnController(turnAbortController);
+
+        // Combine the per-turn signal with the overall timeout signal.
+        const combinedSignal = AbortSignal.any([
+          turnAbortController.signal,
+          timeoutController.signal,
+        ]);
+
         // Check for termination conditions like max turns.
         const reason = this.checkTermination(startTime, turnCounter);
         if (reason) {
@@ -455,10 +484,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         if (turnResult.status === 'stop') {
           terminateReason = turnResult.terminateReason;
 
-          // On the first abort, send the user's message back into the loop.
-          if (terminateReason === AgentTerminateMode.ABORTED && !abortedOnce) {
-            debugLogger.log(`[AgentExecutor] First time user aborted.`);
-            abortedOnce = true;
+          if (terminateReason === AgentTerminateMode.ABORTED) {
+            debugLogger.log(`[AgentExecutor] Turn aborted by user.`);
             currentMessage = {
               role: 'user',
               parts: [
@@ -468,14 +495,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
               ],
             };
 
-            // Reset the combined signal to allow the next turn to execute.
-            // A second user abort will be treated as a final termination.
-            combinedSignal = AbortSignal.any([
-              signal,
-              timeoutController.signal,
-            ]);
-
-            // Now we continue to the next loop iteration...
             continue;
           }
 
@@ -498,12 +517,15 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminateReason !== AgentTerminateMode.ABORTED &&
         terminateReason !== AgentTerminateMode.GOAL
       ) {
+        // Get the current signal for this turn. It might have been reset.
+        const turnAbortController = new AbortController();
+
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
           tools,
           turnCounter, // Use current turnCounter for the recovery attempt
           terminateReason,
-          signal, // Pass the external signal
+          turnAbortController.signal, // Pass the turn signal
         );
 
         if (recoveryResult !== null) {
@@ -557,50 +579,54 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminate_reason: terminateReason,
       };
     } catch (error) {
-      // Check if the error is an AbortError caused by our internal timeout.
-      if (
-        error instanceof Error &&
-        error.name === 'AbortError' &&
-        timeoutController.signal.aborted &&
-        !signal.aborted // Ensure the external signal was not the cause
-      ) {
-        terminateReason = AgentTerminateMode.TIMEOUT;
+      // Check if the error is an AbortError. This will now catch both the
+      // master timeout and the turn-specific aborts.
+      if (error instanceof Error && error.name === 'AbortError') {
+        // If the timeout controller was the one that aborted, it's a timeout.
+        if (timeoutController.signal.aborted) {
+          terminateReason = AgentTerminateMode.TIMEOUT;
+          // Also use the unified recovery logic here
+          if (chat && tools) {
+            // Get the current signal for this turn. It might have been reset.
+            const turnAbortController = new AbortController();
 
-        // Also use the unified recovery logic here
-        if (chat && tools) {
-          const recoveryResult = await this.executeFinalWarningTurn(
-            chat,
-            tools,
-            turnCounter, // Use current turnCounter
-            AgentTerminateMode.TIMEOUT,
-            signal,
-          );
+            const recoveryResult = await this.executeFinalWarningTurn(
+              chat,
+              tools,
+              turnCounter, // Use current turnCounter
+              AgentTerminateMode.TIMEOUT,
+              turnAbortController.signal,
+            );
 
-          if (recoveryResult !== null) {
-            // Recovery Succeeded
-            terminateReason = AgentTerminateMode.GOAL;
-            finalResult = recoveryResult;
-            return {
-              result: finalResult,
-              terminate_reason: terminateReason,
-            };
+            if (recoveryResult !== null) {
+              // Recovery Succeeded
+              terminateReason = AgentTerminateMode.GOAL;
+              finalResult = recoveryResult;
+              return {
+                result: finalResult,
+                terminate_reason: terminateReason,
+              };
+            }
           }
+          // Recovery failed or wasn't possible
+          finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+          this.emitActivity('ERROR', {
+            error: finalResult,
+            context: 'timeout',
+          });
+          return {
+            result: finalResult,
+            terminate_reason: terminateReason,
+          };
+        } else {
+          // Otherwise, it was an abort from the per-turn signal. We re-throw
+          // to let the SubagentInvocation handle it as an interruption.
+          throw error;
         }
-
-        // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
-        this.emitActivity('ERROR', {
-          error: finalResult,
-          context: 'timeout',
-        });
-        return {
-          result: finalResult,
-          terminate_reason: terminateReason,
-        };
       }
 
       this.emitActivity('ERROR', { error: String(error) });
-      throw error; // Re-throw other errors or external aborts.
+      throw error; // Re-throw other errors.
     } finally {
       clearTimeout(timeoutId);
       logAgentFinish(
@@ -613,6 +639,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           terminateReason,
         ),
       );
+      signalManager.endAgentSession();
     }
   }
 

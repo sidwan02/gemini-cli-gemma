@@ -37,6 +37,7 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
+  signalManager,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -111,6 +112,12 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
 ) => {
+  useEffect(() => {
+    signalManager.startAgentSession();
+    return () => {
+      signalManager.endAgentSession();
+    };
+  }, []);
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
@@ -277,6 +284,7 @@ export const useGeminiStream = (
   }, [streamingState, config, history]);
 
   const cancelOngoingRequest = useCallback(() => {
+    debugLogger.log('[useGeminiStream]', 'Cancelling ongoing request.');
     if (
       streamingState !== StreamingState.Responding &&
       streamingState !== StreamingState.WaitingForConfirmation
@@ -301,7 +309,7 @@ export const useGeminiStream = (
 
     // The order is important here.
     // 1. Fire the signal to interrupt any active async operations.
-    abortControllerRef.current.abort();
+    signalManager.abortCurrent();
     // 2. Call the imperative cancel to clear the queue of pending tools.
     cancelAllToolCalls(abortControllerRef.current.signal);
 
@@ -860,6 +868,7 @@ export const useGeminiStream = (
           //      2. Loss of external control: If executor.ts were to create its own AbortController on each loop iteration, the cancelOngoingRequest function in useGeminiStream.ts would lose its ability to directly abort the agent after the first turn. useGeminiStream.ts would be aborting an AbortController
           // that executor.ts is no longer actively listening to, effectively breaking the user's ability to trigger a second abort.
           abortControllerRef.current = new AbortController();
+          signalManager.setCurrentTurnController(abortControllerRef.current);
           const abortSignal = abortControllerRef.current.signal;
           turnCancelledRef.current = false;
 

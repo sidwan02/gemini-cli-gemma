@@ -373,3 +373,96 @@ curl -L -X POST 'http://localhost:4000/v1beta/models/gemini-2.5-flash-lite:gener
 - https://docs.litellm.ai/docs/providers/gemini
 - https://docs.litellm.ai/docs/generateContent#:~:text=Google%20GenAI%20SDK%20with%20LiteLLM,%7D'
 - https://docs.litellm.ai/docs/providers/ollama#example-usage---streaming--acompletion
+
+# Handling Signal Interrupts
+
+Example Scenario
+
+1.  Delegation: The main agent is tasked with a broad goal and delegates a
+    specific sub-task to the subagent tool. For instance, "Analyze the litellm
+    codebase for all dependencies."
+2.  Subagent Execution: The subagent starts its process. It decides to first
+    list all package.json files (glob tool) and then read them one by one
+    (read_file tool).
+3.  User Interruption: While the subagent is executing a long-running read_file
+    call, the user presses Ctrl+C.
+4.  Desired Outcome:
+    - The subagent's in-progress read_file tool call is immediately aborted.
+    - The subagent's own execution loop catches this specific "interruption"
+      signal.
+    - Instead of terminating, the subagent is fed a new, hardcoded input: "User
+      has interrupted. Please reassess your plan and continue."
+    - The subagent processes this message, perhaps changing its strategy. It
+      might now decide to only look at the root package.json and ignore the
+      rest. It continues executing tool calls to fulfill its original goal,
+      informed by the new guidance.
+    - The main agent is still waiting for the subagent tool to return its final
+      result and is completely unaware of the Ctrl+C event.
+
+Based on my analysis of useGeminiStream.ts, here’s how the cancellation works:
+
+1.  New Controller Per Turn: Each time you submit a query, a new AbortController
+    is created specifically for that turn.
+2.  Signal Propagation: The signal from this controller is passed down through
+    the entire call stack, including the Gemini API stream and the tool
+    scheduler.
+3.  Keypress Trigger: The useKeypress hook listens for the escape key. When
+    pressed, it calls the cancelOngoingRequest function.
+4.  Cancellation Flow:
+    - cancelOngoingRequest immediately calls .abort() on the current turn's
+      AbortController.
+    - It also calls cancelAllToolCalls, which clears any tools that are waiting
+      to be executed. █
+5.  Silent Error Handling: The main execution loop has a try...catch block that
+    specifically looks for an AbortError. It catches this error silently,
+    preventing it from being displayed as an unhandled exception, and instead
+    shows a clean "Request cancelled" message. █ █ In short, pressing escape
+    aborts the controller for the current turn, which cancels all associated
+    tools and network requests without terminating the application.
+
+How It Works in Practice
+
+1.  Main Agent Starts: Before the main UI renders, startAgentSession() is called
+    once. The stack now has one level.
+2.  A Turn Begins (Main Agent): Inside submitQuery in useGeminiStream.ts, right
+    after abortControllerRef.current = new AbortController() is created, we call
+    signalManager.setCurrentTurnController(abortControllerRef.current). The
+    manager updates the controller for the main agent's context.
+3.  Subagent Is Invoked:
+    - The executor.ts is about to run the subagent tool.
+    - It first calls signalManager.startAgentSession(). The stack now has two
+      levels.
+    - It then starts the subagent's own while(True) loop.
+4.  A Turn Begins (Subagent):
+    - In the while loop, the subagent creates its own new AbortController.
+    - It calls signalManager.setCurrentTurnController(...) with its new
+      controller. The manager updates the controller for the subagent's context
+      (the top of the stack).
+    - The subagent calls executeTurn.
+
+5.  `Ctrl+C` Is Pressed:
+    - The global handler calls signalManager.abortCurrent().
+    - The manager looks at the top of the stack (the subagent's context) and
+      aborts the specific controller that was set for the subagent's current
+      turn.
+    - The subagent's turnSignal.aborted checks catch the abort. This propagates
+      up to the while True loop, which detects the abort and so sends the new,
+      hardcoded prompt. The main agent's controller is unaffected.
+    - If `Ctrl+C` is pressed twice in the same turn, the Subagent will be
+      aborted:
+      - The executor.ts calls signalManager.endAgentSession() in a finally
+        block.
+      - The stack is now back to one level (the main agent).
+6.  Subagent Finishes:
+    - The subagent tool call returns.
+    - The executor.ts calls signalManager.endAgentSession() in a finally block.
+    - The stack is now back to one level (the main agent).
+
+Refined Proposal
+
+The AbortSignalManager needs to manage a stack of agent contexts, where each
+context holds the currently active turn's `AbortController`.
+
+Your task is to look at the files, especially useReactToolScheduler.ts,
+invocation.ts, executor.ts, useGeminiStream.ts, and make a details plan for how
+you will handle the user flow above.
