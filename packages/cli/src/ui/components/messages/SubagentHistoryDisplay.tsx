@@ -44,8 +44,25 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
   //   )}`,
   // );
   const processedHistory = history.reduce((acc, item) => {
-    if (item.type === 'start' || item.type === 'error') {
-      acc.push(item);
+    if (
+      item.type === 'start' ||
+      item.type === 'error' ||
+      item.type === 'interrupted'
+    ) {
+      const lastItem = acc.at(-1);
+      // If the last item was also an interruption, replace it with the current
+      // one. This ensures that only the most recent interrupt status (e.g.,
+      // "interrupted" vs. "terminated") is displayed.
+      if (
+        lastItem &&
+        'type' in lastItem &&
+        lastItem.type === 'interrupted' &&
+        item.type === 'interrupted'
+      ) {
+        acc[acc.length - 1] = item;
+      } else {
+        acc.push(item);
+      }
       return acc;
     }
 
@@ -191,6 +208,18 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
               width={availableWidth}
             >
               <Text color="red">Error in subagent: {item.data.error}</Text>
+            </Box>
+          );
+        }
+        if (item.type === 'interrupted') {
+          return (
+            <Box
+              key={index}
+              flexDirection="column"
+              marginBottom={1}
+              width={availableWidth}
+            >
+              <Text>ℹ {item.data.message}</Text>
             </Box>
           );
         }

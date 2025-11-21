@@ -34,6 +34,7 @@ export type ScheduleFn = (
   signal: AbortSignal,
 ) => void;
 export type MarkToolsAsSubmittedFn = (callIds: string[]) => void;
+export type InterruptSubagentHistoryFn = (message: string) => void;
 
 export type TrackedScheduledToolCall = ScheduledToolCall & {
   responseSubmittedToGemini?: boolean;
@@ -77,6 +78,7 @@ export function useReactToolScheduler(
   MarkToolsAsSubmittedFn,
   React.Dispatch<React.SetStateAction<TrackedToolCall[]>>,
   CancelAllFn,
+  InterruptSubagentHistoryFn,
 ] {
   const [toolCallsForDisplay, setToolCallsForDisplay] = useState<
     TrackedToolCall[]
@@ -300,12 +302,35 @@ export function useReactToolScheduler(
     [scheduler],
   );
 
+  const interruptSubagentHistory = useCallback((message: string) => {
+    setToolCallsForDisplay((prevCalls) =>
+      prevCalls.map((tc) => {
+        if (tc.status === 'executing' && tc.subagentHistory) {
+          const executingTc = tc as TrackedExecutingToolCall;
+          const newHistoryItem: SubagentHistoryItem = {
+            type: 'interrupted',
+            data: { message },
+          };
+          return {
+            ...executingTc,
+            subagentHistory: [
+              ...(executingTc.subagentHistory || []),
+              newHistoryItem,
+            ],
+          };
+        }
+        return tc;
+      }),
+    );
+  }, []);
+
   return [
     toolCallsForDisplay,
     schedule,
     markToolsAsSubmitted,
     setToolCallsForDisplay,
     cancelAllToolCalls,
+    interruptSubagentHistory,
   ];
 }
 

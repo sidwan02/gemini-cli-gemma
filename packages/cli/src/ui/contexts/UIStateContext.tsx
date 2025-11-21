@@ -89,6 +89,7 @@ export interface UIState {
   ideContextState: IdeContext | undefined;
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
+  subagentInterruptPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
   elapsedTime: number;

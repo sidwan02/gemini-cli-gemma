@@ -45,6 +45,7 @@ import {
   type ResumedSessionData,
   recordExitFail,
   ShellExecutionService,
+  // signalManager,
   saveApiKey,
   debugLogger,
   coreEvents,
@@ -669,6 +670,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    handleSubagentInterrupt,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -903,6 +905,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [subagentInterruptPressedOnce, setSubagentInterruptPressedOnce] =
+    useState(false);
+  const lastCtrlEPressTimeRef = useRef<number | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
@@ -1012,6 +1017,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
   }, [handleNewMessage, config]);
 
+  // TODO: make change here.
   useEffect(() => {
     if (ctrlCTimerRef.current) {
       clearTimeout(ctrlCTimerRef.current);
@@ -1102,14 +1108,33 @@ Logging in with Google... Please restart Gemini CLI to continue.
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
         cancelOngoingRequest?.();
-
         setCtrlCPressCount((prev) => prev + 1);
+
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
           return;
         }
         setCtrlDPressCount((prev) => prev + 1);
+        return;
+      } else if (keyMatchers[Command.TERMINATE_SUBAGENT](key)) {
+        const now = Date.now();
+        const lastPress = lastCtrlEPressTimeRef.current;
+        const isDoublePress =
+          lastPress !== null && now - lastPress < WARNING_PROMPT_DURATION_MS;
+
+        if (isDoublePress) {
+          handleSubagentInterrupt?.(true); // Hard abort
+          lastCtrlEPressTimeRef.current = null; // Reset after double press
+          setSubagentInterruptPressedOnce(false);
+        } else {
+          handleSubagentInterrupt?.(false); // Soft abort
+          lastCtrlEPressTimeRef.current = now;
+          setSubagentInterruptPressedOnce(true);
+          setTimeout(() => {
+            setSubagentInterruptPressedOnce(false);
+          }, WARNING_PROMPT_DURATION_MS);
+        }
         return;
       }
 
@@ -1165,6 +1190,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setCopyModeEnabled,
       copyModeEnabled,
       isAlternateBuffer,
+
+      handleSubagentInterrupt,
     ],
   );
 
@@ -1392,6 +1419,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ideContextState,
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
+      subagentInterruptPressedOnce,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
       isFocused,
@@ -1484,6 +1512,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ctrlCPressCount,
       ctrlDPressCount,
       showEscapePrompt,
+      subagentInterruptPressedOnce,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,

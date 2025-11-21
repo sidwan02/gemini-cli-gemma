@@ -15,8 +15,7 @@ export const DOUBLE_INTERRUPT = 'DOUBLE_INTERRUPT';
 
 interface AgentContext {
   currentTurnController: AbortController | null;
-  // Count interrupts within a single turn.
-  interruptCount: number;
+  isHardAbort: boolean;
 }
 
 class AbortSignalManager {
@@ -26,7 +25,7 @@ class AbortSignalManager {
     debugLogger.log('[AbortSignalManager]', 'Starting new agent session.');
     this.contextStack.push({
       currentTurnController: null,
-      interruptCount: 0,
+      isHardAbort: false,
     });
   }
 
@@ -40,7 +39,18 @@ class AbortSignalManager {
     const currentContext = this.getCurrentContext();
     if (currentContext) {
       currentContext.currentTurnController = controller;
-      currentContext.interruptCount = 0; // Reset for the new turn.
+      currentContext.isHardAbort = false; // Reset for the new turn.
+    }
+  }
+
+  setHardAbort(isHard: boolean): void {
+    const currentContext = this.getCurrentContext();
+    if (currentContext) {
+      debugLogger.log(
+        '[AbortSignalManager]',
+        `Setting hard abort status to: ${isHard}`,
+      );
+      currentContext.isHardAbort = isHard;
     }
   }
 
@@ -50,15 +60,11 @@ class AbortSignalManager {
       return;
     }
 
-    currentContext.interruptCount++;
-
-    if (currentContext.interruptCount > 1) {
-      debugLogger.log('[AbortSignalManager]', 'Double interrupt detected.');
-      // Second Ctrl+C.
+    if (currentContext.isHardAbort) {
+      debugLogger.log('[AbortSignalManager]', 'Hard abort detected.');
       currentContext.currentTurnController.abort(DOUBLE_INTERRUPT);
     } else {
-      debugLogger.log('[AbortSignalManager]', 'Single interrupt detected.');
-      // First Ctrl+C.
+      debugLogger.log('[AbortSignalManager]', 'Soft abort detected.');
       currentContext.currentTurnController.abort(SINGLE_INTERRUPT);
     }
   }
@@ -67,9 +73,9 @@ class AbortSignalManager {
     return this.contextStack.length;
   }
 
-  getCurrentInterruptCount(): number {
+  isCurrentInterruptHard(): boolean {
     const currentContext = this.getCurrentContext();
-    return currentContext ? currentContext.interruptCount : 0;
+    return currentContext ? currentContext.isHardAbort : false;
   }
 
   private getCurrentContext(): AgentContext | undefined {

@@ -221,11 +221,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (turnSignal.aborted) {
       debugLogger.log(
-        `[Debug] Current turn interrupt count: ${signalManager.getCurrentInterruptCount()}.`,
+        `[Debug] Turn aborted. Hard abort status: ${signalManager.isCurrentInterruptHard()}.`,
       );
 
-      // Can't do something like turnSignal.reason === SINGLE_INTERRUPT because the reason is only updated the first time the signal aborts (pass by value so this reason won't be updated, but the abort status is pass by reference).
-      if (signalManager.getCurrentInterruptCount() <= 1) {
+      if (signalManager.isCurrentInterruptHard()) {
+        return {
+          status: 'stop',
+          terminateReason: timeoutSignal.aborted
+            ? AgentTerminateMode.TIMEOUT
+            : AgentTerminateMode.ABORTED,
+          finalResult: null, // 'run' method will set the final timeout string
+        };
+      } else {
+        // Soft interrupt
         return {
           status: 'continue',
           nextMessage: {
@@ -238,19 +246,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           },
         };
       }
-
-      const terminateReason =
-        signalManager.getCurrentInterruptCount() > 1
-          ? AgentTerminateMode.ABORTED
-          : timeoutSignal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-
-      return {
-        status: 'stop',
-        terminateReason,
-        finalResult: null, // 'run' method will set the final timeout string
-      };
     }
 
     // If the model stops calling tools without calling complete_task, it's an error.

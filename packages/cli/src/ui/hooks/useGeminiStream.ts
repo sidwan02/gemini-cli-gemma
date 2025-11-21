@@ -143,6 +143,7 @@ export const useGeminiStream = (
     markToolsAsSubmitted,
     setToolCallsForDisplay,
     cancelAllToolCalls,
+    interruptSubagentHistory,
   ] = useReactToolScheduler(
     async (completedToolCallsFromScheduler) => {
       // This onComplete is called when ALL scheduled tools for a given batch are done.
@@ -302,20 +303,21 @@ export const useGeminiStream = (
 
     // The order is important here.
     // 1. Fire the signal to interrupt any active async operations.
+    // TODO: should abort all signals in the stack since this directly goes to depth 1.
     signalManager.abortCurrent();
 
     // A stack size of 1 means this is the main, top-level agent turn.
     // A size > 1 would mean a subagent is active. We only want to set the
     // ref to fully cancel the turn if the main loop is the one
     // being cancelled.
-    if (signalManager.getStackSize() > 1) {
-      debugLogger.log(
-        '[useGeminiStream]',
-        'Cancellation applied to subagent at depth ',
-        signalManager.getStackSize(),
-      );
-      return;
-    }
+    // if (signalManager.getStackSize() > 1) {
+    //   debugLogger.log(
+    //     '[useGeminiStream]',
+    //     'Cancellation applied to subagent at depth ',
+    //     signalManager.getStackSize(),
+    //   );
+    //   return;
+    // }
 
     // A full cancellation means no tools have produced a final result yet.
     // This determines if we show a generic "Request cancelled" message.
@@ -366,6 +368,35 @@ export const useGeminiStream = (
     cancelAllToolCalls,
     toolCalls,
   ]);
+
+  const handleSubagentInterrupt = useCallback(
+    (isHardAbort: boolean) => {
+      // Only abort the current turn, not the whole session.
+      if (signalManager.getStackSize() <= 1) {
+        // Not in a subagent, do nothing.
+        debugLogger.log(
+          '[handleSubagentInterrupt]',
+          'Not in a subagent, ignoring interrupt.',
+        );
+        return;
+      }
+
+      // Interrupt the current subagent turn.
+      debugLogger.log(
+        '[handleSubagentInterrupt]',
+        `Interrupting subagent turn. Hard abort: ${isHardAbort}`,
+      );
+      signalManager.setHardAbort(isHardAbort);
+      signalManager.abortCurrent();
+
+      if (isHardAbort) {
+        interruptSubagentHistory('Subagent terminated by user.');
+      } else {
+        interruptSubagentHistory('Subagent interrupted by user.');
+      }
+    },
+    [interruptSubagentHistory],
+  );
 
   useKeypress(
     (key) => {
@@ -1347,5 +1378,6 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    handleSubagentInterrupt,
   };
 };

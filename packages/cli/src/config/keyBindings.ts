@@ -75,6 +75,7 @@ export enum Command {
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
   COLLAPSE_SUGGESTION = 'collapseSuggestion',
+  TERMINATE_SUBAGENT = 'terminateSubagent',
 }
 
 /**
@@ -210,6 +211,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
+  [Command.TERMINATE_SUBAGENT]: [{ key: 'e', ctrl: true }],
 
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
@@ -308,7 +310,7 @@ export const commandCategories: readonly CommandCategory[] = [
   },
   {
     title: 'Session Control',
-    commands: [Command.QUIT, Command.EXIT],
+    commands: [Command.QUIT, Command.EXIT, Command.TERMINATE_SUBAGENT],
   },
 ];
 
@@ -363,4 +365,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Toggle focus between the shell and Gemini input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+  [Command.TERMINATE_SUBAGENT]:
+    'Forcefully terminate the currently running subagent.',
 };
