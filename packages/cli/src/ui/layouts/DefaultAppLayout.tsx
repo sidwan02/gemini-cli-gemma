@@ -12,12 +12,15 @@ import { DialogManager } from '../components/DialogManager.js';
 import { Composer } from '../components/Composer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
+import { SubagentInterruptDialog } from '../components/SubagentInterruptDialog.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
+  const uiActions = useUIActions();
   const isAlternateBuffer = useAlternateBuffer();
 
   const { rootUiRef, terminalHeight } = uiState;
@@ -50,6 +53,11 @@ export const DefaultAppLayout: React.FC = () => {
 
         {uiState.customDialog ? (
           uiState.customDialog
+        ) : uiState.showSubagentInterruptDialog ? (
+          <SubagentInterruptDialog
+            onSubmit={uiActions.handleSubagentInterruptSubmit}
+            onCancel={uiActions.handleSubagentInterruptCancel}
+          />
         ) : uiState.dialogsVisible ? (
           <DialogManager
             terminalWidth={uiState.mainAreaWidth}

@@ -234,13 +234,26 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         };
       } else {
         // Soft interrupt
+        const userInterruptPromise = new Promise<string>((resolve) => {
+          this.runtimeContext.setSubagentInterruptResolver(resolve);
+        });
+        this.runtimeContext.setSubagentInterruptPromise(userInterruptPromise);
+
+        const userInterruptMessage = await userInterruptPromise;
+        this.runtimeContext.setSubagentInterruptResolver(undefined);
+        this.runtimeContext.setSubagentInterruptPromise(undefined);
+
+        debugLogger.log(
+          `[Debug] User interrupt received: ${userInterruptMessage}`,
+        );
+
         return {
           status: 'continue',
           nextMessage: {
             role: 'user',
             parts: [
               {
-                text: 'User has interrupted. Acknowledge this and ask if they would like to try an alternative approach.',
+                text: userInterruptMessage,
               },
             ],
           },

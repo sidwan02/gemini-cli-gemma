@@ -445,6 +445,9 @@ export class Config {
     | undefined;
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
+  private subagentInterruptMessage: string | undefined;
+  private subagentInterruptResolver: ((message: string) => void) | undefined;
+  private subagentInterruptPromise: Promise<string> | undefined;
 
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
@@ -1631,6 +1634,32 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  getSubagentInterruptMessage(): string | undefined {
+    return this.subagentInterruptMessage;
+  }
+
+  setSubagentInterruptMessage(message: string | undefined): void {
+    this.subagentInterruptMessage = message;
+  }
+
+  getSubagentInterruptResolver(): ((message: string) => void) | undefined {
+    return this.subagentInterruptResolver;
+  }
+
+  setSubagentInterruptResolver(
+    resolver: ((message: string) => void) | undefined,
+  ): void {
+    this.subagentInterruptResolver = resolver;
+  }
+
+  getSubagentInterruptPromise(): Promise<string> | undefined {
+    return this.subagentInterruptPromise;
+  }
+
+  setSubagentInterruptPromise(promise: Promise<string> | undefined): void {
+    this.subagentInterruptPromise = promise;
   }
 }
 // Export model constants for use in CLI

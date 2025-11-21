@@ -907,6 +907,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [subagentInterruptPressedOnce, setSubagentInterruptPressedOnce] =
     useState(false);
+  const [showSubagentInterruptDialog, setShowSubagentInterruptDialog] =
+    useState(false);
   const lastCtrlEPressTimeRef = useRef<number | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
@@ -1127,13 +1129,18 @@ Logging in with Google... Please restart Gemini CLI to continue.
           handleSubagentInterrupt?.(true); // Hard abort
           lastCtrlEPressTimeRef.current = null; // Reset after double press
           setSubagentInterruptPressedOnce(false);
+          setShowSubagentInterruptDialog(false); // Close dialog on hard abort
         } else {
-          handleSubagentInterrupt?.(false); // Soft abort
+          // Soft interrupt, and open dialog for user message
+          handleSubagentInterrupt?.(false);
           lastCtrlEPressTimeRef.current = now;
           setSubagentInterruptPressedOnce(true);
+          // Set a timeout to reset the "pressed once" state if no second press
           setTimeout(() => {
             setSubagentInterruptPressedOnce(false);
           }, WARNING_PROMPT_DURATION_MS);
+          // Open the dialog to get user input for the subagent
+          setShowSubagentInterruptDialog(true);
         }
         return;
       }
@@ -1194,6 +1201,21 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleSubagentInterrupt,
     ],
   );
+
+  const handleSubagentInterruptSubmit = useCallback(
+    (message: string) => {
+      const resolver = config.getSubagentInterruptResolver();
+      if (resolver) {
+        resolver(message);
+      }
+      setShowSubagentInterruptDialog(false);
+    },
+    [config, setShowSubagentInterruptDialog],
+  );
+
+  const handleSubagentInterruptCancel = useCallback(() => {
+    setShowSubagentInterruptDialog(false);
+  }, [setShowSubagentInterruptDialog]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
@@ -1317,7 +1339,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
     isAuthDialogOpen ||
-    authState === AuthState.AwaitingApiKeyInput;
+    authState === AuthState.AwaitingApiKeyInput ||
+    showSubagentInterruptDialog;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -1464,6 +1487,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         warningText: warningBannerText,
       },
       bannerVisible,
+      showSubagentInterruptDialog,
     }),
     [
       isThemeDialogOpen,
@@ -1556,6 +1580,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       defaultBannerText,
       warningBannerText,
       bannerVisible,
+      showSubagentInterruptDialog,
     ],
   );
 
@@ -1594,6 +1619,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      handleSubagentInterruptSubmit,
+      handleSubagentInterruptCancel,
     }),
     [
       handleThemeSelect,
@@ -1624,6 +1651,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      handleSubagentInterruptSubmit,
+      handleSubagentInterruptCancel,
     ],
   );
 
