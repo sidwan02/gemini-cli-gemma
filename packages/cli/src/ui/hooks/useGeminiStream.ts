@@ -289,12 +289,33 @@ export const useGeminiStream = (
       streamingState !== StreamingState.Responding &&
       streamingState !== StreamingState.WaitingForConfirmation
     ) {
+      debugLogger.log('[useGeminiStream] Current state is: ', streamingState);
       return;
     }
     if (turnCancelledRef.current) {
+      debugLogger.log(
+        '[useGeminiStream]',
+        'Main loop turn has already been cancelled.',
+      );
       return;
     }
-    turnCancelledRef.current = true;
+
+    // The order is important here.
+    // 1. Fire the signal to interrupt any active async operations.
+    signalManager.abortCurrent();
+
+    // A stack size of 1 means this is the main, top-level agent turn.
+    // A size > 1 would mean a subagent is active. We only want to set the
+    // ref to fully cancel the turn if the main loop is the one
+    // being cancelled.
+    if (signalManager.getStackSize() > 1) {
+      debugLogger.log(
+        '[useGeminiStream]',
+        'Cancellation applied to subagent at depth ',
+        signalManager.getStackSize(),
+      );
+      return;
+    }
 
     // A full cancellation means no tools have produced a final result yet.
     // This determines if we show a generic "Request cancelled" message.
@@ -302,15 +323,16 @@ export const useGeminiStream = (
       (tc) => tc.status === 'success' || tc.status === 'error',
     );
 
+    turnCancelledRef.current = true;
+
     // Ensure we have an abort controller, creating one if it doesn't exist.
+    // TODO: when will this ever be non-null?
     if (!abortControllerRef.current) {
       abortControllerRef.current = new AbortController();
     }
 
-    // The order is important here.
-    // 1. Fire the signal to interrupt any active async operations.
-    signalManager.abortCurrent();
     // 2. Call the imperative cancel to clear the queue of pending tools.
+    // TODO: may need to call this even when aborting during subagent. (by implementing a cancellAllToolsForSignal). Not needed right now since subagents only have one tool call per turn.
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {

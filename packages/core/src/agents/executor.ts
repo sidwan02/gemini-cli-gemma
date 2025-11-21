@@ -67,8 +67,8 @@ import * as fs from 'node:fs/promises';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   signalManager,
-  SINGLE_INTERRUPT,
-  DOUBLE_INTERRUPT,
+  // SINGLE_INTERRUPT,
+  // DOUBLE_INTERRUPT,
 } from '../common/abort-signal-manager.js';
 
 /** A callback function to report on agent activity. */
@@ -221,9 +221,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (turnSignal.aborted) {
       debugLogger.log(
-        `[Debug] Combined signal aborted (reason: ${turnSignal.reason}), stopping agent execution.`,
+        `[Debug] Current turn interrupt count: ${signalManager.getCurrentInterruptCount()}.`,
       );
-      if (turnSignal.reason === SINGLE_INTERRUPT) {
+
+      // Can't do something like turnSignal.reason === SINGLE_INTERRUPT because the reason is only updated the first time the signal aborts (pass by value so this reason won't be updated, but the abort status is pass by reference).
+      if (signalManager.getCurrentInterruptCount() <= 1) {
         return {
           status: 'continue',
           nextMessage: {
@@ -238,7 +240,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       const terminateReason =
-        turnSignal.reason === DOUBLE_INTERRUPT
+        signalManager.getCurrentInterruptCount() > 1
           ? AgentTerminateMode.ABORTED
           : timeoutSignal.aborted
             ? AgentTerminateMode.TIMEOUT
@@ -483,20 +485,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (turnResult.status === 'stop') {
           terminateReason = turnResult.terminateReason;
-
-          if (terminateReason === AgentTerminateMode.ABORTED) {
-            debugLogger.log(`[AgentExecutor] Turn aborted by user.`);
-            currentMessage = {
-              role: 'user',
-              parts: [
-                {
-                  text: 'The user has aborted the request. Acknowledge this and ask if they would like to try an alternative approach.',
-                },
-              ],
-            };
-
-            continue;
-          }
 
           // Only set finalResult if the turn provided one (e.g., error or goal).
           if (turnResult.finalResult) {

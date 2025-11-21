@@ -9,6 +9,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 /**
  * A reason for an AbortController to be aborted.
  */
+
 export const SINGLE_INTERRUPT = 'SINGLE_INTERRUPT';
 export const DOUBLE_INTERRUPT = 'DOUBLE_INTERRUPT';
 
@@ -52,20 +53,23 @@ class AbortSignalManager {
     currentContext.interruptCount++;
 
     if (currentContext.interruptCount > 1) {
-      debugLogger.log(
-        '[AbortSignalManager]',
-        'Double interrupt detected. Forcing immediate abort.',
-      );
+      debugLogger.log('[AbortSignalManager]', 'Double interrupt detected.');
       // Second Ctrl+C.
       currentContext.currentTurnController.abort(DOUBLE_INTERRUPT);
     } else {
-      debugLogger.log(
-        '[AbortSignalManager]',
-        'Single interrupt detected. Aborting current operation.',
-      );
+      debugLogger.log('[AbortSignalManager]', 'Single interrupt detected.');
       // First Ctrl+C.
       currentContext.currentTurnController.abort(SINGLE_INTERRUPT);
     }
+  }
+
+  getStackSize(): number {
+    return this.contextStack.length;
+  }
+
+  getCurrentInterruptCount(): number {
+    const currentContext = this.getCurrentContext();
+    return currentContext ? currentContext.interruptCount : 0;
   }
 
   private getCurrentContext(): AgentContext | undefined {
