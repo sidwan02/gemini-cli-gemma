@@ -373,10 +373,10 @@ export const useGeminiStream = (
     (isHardAbort: boolean) => {
       // Only abort the current turn, not the whole session.
       if (signalManager.getStackSize() <= 1) {
-        // Not in a subagent, do nothing.
+        // Not in a subagent, do nothing. Should actually never get here since it's handled in AppContainer.
         debugLogger.log(
           '[handleSubagentInterrupt]',
-          'Not in a subagent, ignoring interrupt.',
+          'Not in a subagent, ignoring interrupt. SHOULD NEVER HAPPEN SINCE IT"S HANDLED IN APP CONTAINER.',
         );
         return;
       }

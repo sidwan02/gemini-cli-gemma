@@ -99,6 +99,10 @@ export const Composer = () => {
             <Text color={theme.status.warning}>
               Press Ctrl+C again to exit.
             </Text>
+          ) : uiState.showNoSubagentMessage ? (
+            <Text color={theme.status.warning}>
+              No subagent is currently active.
+            </Text>
           ) : uiState.subagentInterruptPressedOnce ? (
             <Text color={theme.status.warning}>
               Press Ctrl+E again to abort subagent.

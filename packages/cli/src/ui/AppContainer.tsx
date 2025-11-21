@@ -45,7 +45,7 @@ import {
   type ResumedSessionData,
   recordExitFail,
   ShellExecutionService,
-  // signalManager,
+  signalManager,
   saveApiKey,
   debugLogger,
   coreEvents,
@@ -909,6 +909,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     useState(false);
   const [showSubagentInterruptDialog, setShowSubagentInterruptDialog] =
     useState(false);
+  const [showNoSubagentMessage, setShowNoSubagentMessage] = useState(false);
   const lastCtrlEPressTimeRef = useRef<number | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
@@ -1120,6 +1121,14 @@ Logging in with Google... Please restart Gemini CLI to continue.
         setCtrlDPressCount((prev) => prev + 1);
         return;
       } else if (keyMatchers[Command.TERMINATE_SUBAGENT](key)) {
+        if (signalManager.getStackSize() <= 1) {
+          setShowNoSubagentMessage(true);
+          setTimeout(() => {
+            setShowNoSubagentMessage(false);
+          }, WARNING_PROMPT_DURATION_MS);
+          return;
+        }
+
         const now = Date.now();
         const lastPress = lastCtrlEPressTimeRef.current;
         const isDoublePress =
@@ -1488,6 +1497,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       },
       bannerVisible,
       showSubagentInterruptDialog,
+      showNoSubagentMessage,
     }),
     [
       isThemeDialogOpen,
@@ -1581,6 +1591,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       warningBannerText,
       bannerVisible,
       showSubagentInterruptDialog,
+      showNoSubagentMessage,
     ],
   );
 

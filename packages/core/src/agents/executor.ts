@@ -244,7 +244,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         this.runtimeContext.setSubagentInterruptPromise(undefined);
 
         debugLogger.log(
-          `[Debug] User interrupt received: ${userInterruptMessage}`,
+          `[Debug] User interrupt received ==========: ${userInterruptMessage}`,
         );
 
         return {

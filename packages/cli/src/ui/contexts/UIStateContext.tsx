@@ -91,6 +91,7 @@ export interface UIState {
   ctrlCPressedOnce: boolean;
   subagentInterruptPressedOnce: boolean;
   showSubagentInterruptDialog: boolean;
+  showNoSubagentMessage: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
   elapsedTime: number;
@@ -131,7 +132,6 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
-  subagentMessage: string | null;
   bannerData: {
     defaultText: string;
     warningText: string;

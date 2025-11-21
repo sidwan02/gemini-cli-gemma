@@ -9,7 +9,8 @@
     },
     "buildAndTestSettings": {
       "enabled": true,
-      "model": "gemma3n:e4b"
+      // "model": "gemma3n:e4b"
+      "model": "gemma3:12b"
       // "model": "gemma3:12b"
     },
     "useModelRouter": {
