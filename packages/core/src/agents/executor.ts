@@ -221,7 +221,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (turnSignal.aborted) {
       debugLogger.log(
-        `[Debug] Turn aborted. Hard abort status: ${signalManager.isCurrentInterruptHard()}.`,
+        `[Debug] Turn aborted after callModel. Hard abort status: ${signalManager.isCurrentInterruptHard()}.`,
       );
 
       if (signalManager.isCurrentInterruptHard()) {
@@ -234,18 +234,48 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         };
       } else {
         // Soft interrupt
-        const userInterruptPromise = new Promise<string>((resolve) => {
-          this.runtimeContext.setSubagentInterruptResolver(resolve);
-        });
-        this.runtimeContext.setSubagentInterruptPromise(userInterruptPromise);
+        let userInterruptMessage: string | null;
 
-        const userInterruptMessage = await userInterruptPromise;
-        this.runtimeContext.setSubagentInterruptResolver(undefined);
-        this.runtimeContext.setSubagentInterruptPromise(undefined);
+        if (this.runtimeContext.isSubagentInterruptHandled()) {
+          debugLogger.log(
+            `[Debug] User interrupt already handled: ${this.runtimeContext.getSubagentInterruptUserInput()}`,
+          );
+          // The UI has already handled the interrupt and collected the user's input.
+          userInterruptMessage =
+            this.runtimeContext.getSubagentInterruptUserInput();
+
+          // Reset the interrupt state for the next turn.
+          this.runtimeContext.setSubagentInterruptHandled(false);
+          this.runtimeContext.setSubagentInterruptUserInput(null);
+        } else {
+          // The UI has not handled the interrupt, so we need to wait for the user's input.
+          debugLogger.log(
+            `[Debug] Soft interrupt detected. Waiting for user input...`,
+          );
+          const userInterruptPromise = new Promise<string>((resolve) => {
+            this.runtimeContext.setSubagentInterruptResolver(resolve);
+          });
+          this.runtimeContext.setSubagentInterruptPromise(userInterruptPromise);
+          userInterruptMessage = await userInterruptPromise;
+          this.runtimeContext.setSubagentInterruptResolver(undefined);
+          this.runtimeContext.setSubagentInterruptPromise(undefined);
+        }
+
+        if (userInterruptMessage === null) {
+          // This can happen if the promise resolves with nothing, though it shouldn't.
+          // We'll treat it as a hard abort to be safe.
+          return {
+            status: 'stop',
+            terminateReason: AgentTerminateMode.ABORTED,
+            finalResult: null,
+          };
+        }
 
         debugLogger.log(
-          `[Debug] User interrupt received ==========: ${userInterruptMessage}`,
+          `[Debug] User interrupt received: ${userInterruptMessage}`,
         );
+
+        // signalManager.reset();
 
         return {
           status: 'continue',
@@ -465,6 +495,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       while (true) {
+        debugLogger.log(
+          `[AgentExecutor] Starting turn ${turnCounter} for agent ${this.agentId}`,
+        );
         // Get the current signal for this turn. It might have been reset.
         const turnAbortController = new AbortController();
         signalManager.setCurrentTurnController(turnAbortController);
@@ -575,6 +608,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminate_reason: terminateReason,
       };
     } catch (error) {
+      debugLogger.log(
+        '[AgentExecutor] Caught error in run(): ' + String(error),
+      );
       // Check if the error is an AbortError. This will now catch both the
       // master timeout and the turn-specific aborts.
       if (error instanceof Error && error.name === 'AbortError') {
@@ -810,11 +846,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       if (functionCalls.length > 0) {
-        debugLogger.log(
-          `[Debug] Parsed Ollama tool calls from JSON: ${JSON.stringify(
-            functionCalls,
-          )}`,
-        );
+        // debugLogger.log(
+        //   `[Debug] Parsed Ollama tool calls from JSON: ${JSON.stringify(
+        //     functionCalls,
+        //   )}`,
+        // );
         return functionCalls;
       }
     } catch (e) {
@@ -874,9 +910,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         args,
       });
     }
-    debugLogger.log(
-      `[Debug] Parsed Ollama tool calls: ${JSON.stringify(functionCalls)}`,
-    );
+    // debugLogger.log(
+    //   `[Debug] Parsed Ollama tool calls: ${JSON.stringify(functionCalls)}`,
+    // );
     return functionCalls;
   }
 
@@ -1275,11 +1311,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           });
         };
 
+        debugLogger.log(
+          `[AgentExecutor] Executing tool call: ${functionCall.name} (ID: ${callId})`,
+        );
+
         const { response: toolResponse } = await executeToolCall(
           this.runtimeContext,
           requestInfo,
           signal,
           outputUpdateHandler,
+        );
+
+        debugLogger.log(
+          `[AgentExecutor] Tool call completed: ${functionCall.name} (ID: ${callId})`,
         );
 
         if (toolResponse.error) {

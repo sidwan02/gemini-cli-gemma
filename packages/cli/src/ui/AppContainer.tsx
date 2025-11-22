@@ -1213,6 +1213,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleSubagentInterruptSubmit = useCallback(
     (message: string) => {
+      config.setSubagentInterruptUserInput(message);
+      config.setSubagentInterruptHandled(true);
       const resolver = config.getSubagentInterruptResolver();
       if (resolver) {
         resolver(message);

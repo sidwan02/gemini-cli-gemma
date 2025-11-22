@@ -448,6 +448,8 @@ export class Config {
   private subagentInterruptMessage: string | undefined;
   private subagentInterruptResolver: ((message: string) => void) | undefined;
   private subagentInterruptPromise: Promise<string> | undefined;
+  private subagentInterruptUserInput: string | null = null;
+  private subagentInterruptHandled = false;
 
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
@@ -1660,6 +1662,22 @@ export class Config {
 
   setSubagentInterruptPromise(promise: Promise<string> | undefined): void {
     this.subagentInterruptPromise = promise;
+  }
+
+  getSubagentInterruptUserInput(): string | null {
+    return this.subagentInterruptUserInput;
+  }
+
+  setSubagentInterruptUserInput(message: string | null): void {
+    this.subagentInterruptUserInput = message;
+  }
+
+  isSubagentInterruptHandled(): boolean {
+    return this.subagentInterruptHandled;
+  }
+
+  setSubagentInterruptHandled(wasHandled: boolean): void {
+    this.subagentInterruptHandled = wasHandled;
   }
 }
 // Export model constants for use in CLI

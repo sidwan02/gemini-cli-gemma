@@ -142,7 +142,7 @@ export class OllamaChat {
         // lastMessage.content = `${this.promptConfig.directive}\n\n${lastMessage.content}`;
         // lastMessage.content = `${this.promptConfig.directive}\n\n${lastMessage.content}`;
         if (this.promptConfig.reminder) {
-          lastMessage.content += this.promptConfig.reminder;
+          lastMessage.content += '\n\n' + this.promptConfig.reminder;
         }
         // lastMessage.content += `\n\n${this.promptConfig.directive}`;
       }

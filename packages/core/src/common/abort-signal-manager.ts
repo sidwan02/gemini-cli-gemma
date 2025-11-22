@@ -46,10 +46,10 @@ class AbortSignalManager {
   setHardAbort(isHard: boolean): void {
     const currentContext = this.getCurrentContext();
     if (currentContext) {
-      debugLogger.log(
-        '[AbortSignalManager]',
-        `Setting hard abort status to: ${isHard}`,
-      );
+      // debugLogger.log(
+      //   '[AbortSignalManager]',
+      //   `Setting hard abort status to: ${isHard}`,
+      // );
       currentContext.isHardAbort = isHard;
     }
   }
@@ -79,12 +79,12 @@ class AbortSignalManager {
   }
 
   private getCurrentContext(): AgentContext | undefined {
-    debugLogger.log(
-      '[AbortSignalManager]',
-      'Retrieving current agent context at position ' +
-        this.contextStack.length +
-        '.',
-    );
+    // debugLogger.log(
+    //   '[AbortSignalManager]',
+    //   'Retrieving current agent context at position ' +
+    //     this.contextStack.length +
+    //     '.',
+    // );
     return this.contextStack[this.contextStack.length - 1];
   }
 }
