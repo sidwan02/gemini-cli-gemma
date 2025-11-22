@@ -19,6 +19,7 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
+import { debugLogger } from '../utils/debugLogger.js';
 // import { debugLogger } from '../utils/debugLogger.js';
 const { Terminal } = pkg;
 
@@ -144,6 +145,7 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
     if (shouldUseNodePty) {
+      debugLogger.log(`[ShellExecutionService] Attempting to use node-pty.`);
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
@@ -160,6 +162,8 @@ export class ShellExecutionService {
         }
       }
     }
+
+    debugLogger.log(`[ShellExecutionService] Falling back to child_process.`);
 
     return this.childProcessFallback(
       commandToExecute,
@@ -364,7 +368,7 @@ export class ShellExecutionService {
 
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-        child.on('exit', (code, signal) => {
+        child.on('close', (code, signal) => {
           if (child.pid) {
             this.activePtys.delete(child.pid);
           }

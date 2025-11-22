@@ -181,6 +181,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {
+      debugLogger.log('[ShellToolInvocation] Execution aborted before start.');
       return {
         llmContent: 'Command was cancelled by user before it could start.',
         returnDisplay: 'Command cancelled by user.',
@@ -441,20 +442,22 @@ export class ShellToolInvocation extends BaseToolInvocation<
             },
           }
         : {};
-//       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
-//         const summary = await summarizeToolOutput(
-//           this.config,
-//           { model: 'summarizer-shell' },
-//           llmContent,
-//           this.config.getGeminiClient(),
-//           signal,
-//         );
-//         return {
-//           llmContent: summary,
-//           returnDisplay: returnDisplayMessage,
-//           ...executionError,
-//         };
-//       }
+      //       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
+      //         const summary = await summarizeToolOutput(
+      //           this.config,
+      //           { model: 'summarizer-shell' },
+      //           llmContent,
+      //           this.config.getGeminiClient(),
+      //           signal,
+      //         );
+      //         return {
+      //           llmContent: summary,
+      //           returnDisplay: returnDisplayMessage,
+      //           ...executionError,
+      //         };
+      //       }
+
+      debugLogger.log(`[ShellToolInvocation] Execution completed.`);
 
       return {
         llmContent,

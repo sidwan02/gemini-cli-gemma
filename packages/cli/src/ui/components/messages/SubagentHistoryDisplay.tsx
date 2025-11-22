@@ -47,7 +47,8 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
     if (
       item.type === 'start' ||
       item.type === 'error' ||
-      item.type === 'interrupted'
+      item.type === 'interrupted' ||
+      item.type === 'user_message'
     ) {
       const lastItem = acc.at(-1);
       // If the last item was also an interruption, replace it with the current
@@ -220,6 +221,18 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
               width={availableWidth}
             >
               <Text>ℹ {item.data.message}</Text>
+            </Box>
+          );
+        }
+        if (item.type === 'user_message') {
+          return (
+            <Box
+              key={index}
+              flexDirection="column"
+              marginBottom={1}
+              width={availableWidth}
+            >
+              <Text>👤 {item.data.message}</Text>
             </Box>
           );
         }

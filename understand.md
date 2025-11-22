@@ -466,3 +466,30 @@ context holds the currently active turn's `AbortController`.
 Your task is to look at the files, especially useReactToolScheduler.ts,
 invocation.ts, executor.ts, useGeminiStream.ts, and make a details plan for how
 you will handle the user flow above.
+
+# TODO for subagent interruption
+
+- run shell can't handle comandns that need user interaction
+
+```
+PASS  Waiting for file changes...                                                                                                                                                                                                                                                          │ │
+│ │ │          press h to show help, press q to quit
+```
+
+```
+{"id":"d3d0eac2-7ac3-451e-a6b4-70faccfcb751########0-build_and_test_agent-1gm6fe#3-0","name":"run_shell_command","response":{"error":"[Operation Cancelled] Reason: User cancelled tool execution."}}
+```
+
+- if a tool call was cancelled, this shows up as the last message instead of the
+  user's interrupt.
+
+- pressing ctrl + e toggles the interrupt display but also does full abort of
+  the subagent. Need to choose one.
+
+- ctrl + e double should actually be equivalent to ctrl + c.
+
+- prompt engineer so that subagent user redirects are made explicit to the mdoel
+  so it knows that the old task is no longer what the user wants. else, the
+  subagent will terminate properly but the main agent is not made aware that the
+  user's task changed within the subagent, making the main loop start another
+  subagent attempt with the old user request.

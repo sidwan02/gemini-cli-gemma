@@ -144,6 +144,7 @@ export const useGeminiStream = (
     setToolCallsForDisplay,
     cancelAllToolCalls,
     interruptSubagentHistory,
+    addUserMessageToSubagentHistory,
   ] = useReactToolScheduler(
     async (completedToolCallsFromScheduler) => {
       // This onComplete is called when ALL scheduled tools for a given batch are done.
@@ -1379,5 +1380,6 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     handleSubagentInterrupt,
+    addUserMessageToSubagentHistory,
   };
 };

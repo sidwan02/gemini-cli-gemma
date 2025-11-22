@@ -671,6 +671,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     activePtyId,
     loopDetectionConfirmationRequest,
     handleSubagentInterrupt,
+    addUserMessageToSubagentHistory,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1213,6 +1214,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleSubagentInterruptSubmit = useCallback(
     (message: string) => {
+      addUserMessageToSubagentHistory(message);
       config.setSubagentInterruptUserInput(message);
       config.setSubagentInterruptHandled(true);
       const resolver = config.getSubagentInterruptResolver();
@@ -1221,7 +1223,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       }
       setShowSubagentInterruptDialog(false);
     },
-    [config, setShowSubagentInterruptDialog],
+    [config, setShowSubagentInterruptDialog, addUserMessageToSubagentHistory],
   );
 
   const handleSubagentInterruptCancel = useCallback(() => {

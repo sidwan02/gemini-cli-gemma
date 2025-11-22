@@ -403,7 +403,8 @@ export type SubagentHistoryItem =
       type: 'error';
       data: { error: string; context?: string; name?: string };
     }
-  | { type: 'interrupted'; data: { message: string } };
+  | { type: 'interrupted'; data: { message: string } }
+  | { type: 'user_message'; data: { message: string } };
 
 export type SubagentThoughtHistoryItem = Extract<
   SubagentHistoryItem,
