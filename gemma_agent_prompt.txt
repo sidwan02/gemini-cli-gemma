@@ -95,7 +95,213 @@ Response goes here..."
 
 # Environment Context
 I'm currently working in the directory: /Users/siddharthdiwan/Desktop/gemini-cli-gemma. I have access to this directory and its subdirectories.
+Here is the folder structure of the current working directories:
 
+Showing up to 200 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (200 items) was reached.
+
+/Users/siddharthdiwan/Desktop/gemini-cli-gemma/
+├───.editorconfig
+├───.gitattributes
+├───.gitignore
+├───.gitmodules
+├───.lycheeignore
+├───.npmrc
+├───.nvmrc
+├───.prettierignore
+├───.prettierrc.json
+├───.yamllint.yml
+├───CONTRIBUTING.md
+├───Dockerfile
+├───esbuild.config.js
+├───eslint.config.js
+├───GEMINI.md
+├───LICENSE
+├───Makefile
+├───package-lock.json
+├───package.json
+├───README.md
+├───ROADMAP.md
+├───SECURITY.md
+├───tsconfig.json
+├───understand.md
+├───.allstar/
+│   └───branch_protection.yaml
+├───.gcp/
+│   ├───Dockerfile.gemini-code-builder
+│   └───release-docker.yml
+├───.gemini/
+│   ├───config.yaml
+│   ├───settings.json
+│   └───commands/...
+├───.git/...
+├───.github/
+│   ├───CODEOWNERS
+│   ├───dependabot.yml
+│   ├───pull_request_template.md
+│   ├───actions/
+│   ├───ISSUE_TEMPLATE/
+│   ├───scripts/
+│   └───workflows/
+├───.husky/
+│   ├───pre-commit
+│   └───_/
+├───.integration-tests/
+├───.vscode/
+│   ├───extensions.json
+│   ├───launch.json
+│   ├───settings.json
+│   └───tasks.json
+├───bundle/...
+├───docs/
+│   ├───architecture.md
+│   ├───faq.md
+│   ├───index.md
+│   ├───integration-tests.md
+│   ├───issue-and-pr-automation.md
+│   ├───local-development.md
+│   ├───npm.md
+│   ├───quota-and-pricing.md
+│   ├───release-confidence.md
+│   ├───releases.md
+│   ├───sidebar.json
+│   ├───tos-privacy.md
+│   ├───troubleshooting.md
+│   ├───assets/
+│   ├───changelogs/
+│   ├───cli/
+│   ├───core/
+│   ├───examples/
+│   ├───extensions/
+│   ├───get-started/
+│   ├───ide-integration/
+│   ├───mermaid/
+│   └───tools/
+├───hello/
+│   ├───gemini-extension.json
+│   └───commands/
+├───integration-tests/
+│   ├───context-compress-interactive.compress-empty.responses
+│   ├───context-compress-interactive.compress-failure.responses
+│   ├───context-compress-interactive.compress.responses
+│   ├───context-compress-interactive.test.ts
+│   ├───ctrl-c-exit.test.ts
+│   ├───extensions-install.test.ts
+│   ├───extensions-reload.test.ts
+│   ├───file-system-interactive.test.ts
+│   ├───file-system.test.ts
+│   ├───flicker-detector.max-height.responses
+│   ├───flicker.test.ts
+│   ├───globalSetup.ts
+│   ├───google_web_search.test.ts
+│   ├───json-output.error.responses
+│   ├───json-output.test.ts
+│   ├───list_directory.test.ts
+│   ├───mcp_server_cyclic_schema.test.ts
+│   ├───mixed-input-crash.test.ts
+│   ├───package-lock.json
+│   ├───read_many_files.test.ts
+│   ├───replace.test.ts
+│   ├───ripgrep-real.test.ts
+│   ├───run_shell_command.test.ts
+│   ├───save_memory.test.ts
+│   ├───simple-mcp-server.test.ts
+│   ├───stdin-context.test.ts
+│   ├───telemetry.test.ts
+│   ├───test-helper.ts
+│   ├───test-mcp-server.ts
+│   ├───tsconfig.json
+│   ├───utf-bom-encoding.test.ts
+│   ├───vitest.config.ts
+│   ├───write_file.test.ts
+│   └───node_modules/...
+├───litellm/
+│   ├───.dockerignore
+│   ├───.env.example
+│   ├───.flake8
+│   ├───.git-blame-ignore-revs
+│   ├───.gitattributes
+│   ├───.pre-commit-config.yaml
+│   ├───AGENTS.md
+│   ├───CLAUDE.md
+│   ├───codecov.yaml
+│   ├───CONTRIBUTING.md
+│   ├───docker-compose.yml
+│   ├───Dockerfile
+│   ├───GEMINI.md
+│   ├───index.yaml
+│   ├───LICENSE
+│   ├───Makefile
+│   ├───mcp_servers.json
+│   ├───model_prices_and_context_window.json
+│   ├───package-lock.json
+│   ├───package.json
+│   ├───poetry.lock
+│   ├───prometheus.yml
+│   ├───proxy_server_config.yaml
+│   ├───pyproject.toml
+│   ├───pyrightconfig.json
+│   ├───README.md
+│   ├───render.yaml
+│   ├───ruff.toml
+│   ├───schema.prisma
+│   ├───security.md
+│   ├───setup_vertex_env.sh
+│   ├───test_pydantic_fields.py
+│   ├───test_sdk.py
+│   ├───VERTEX_ENV_SETUP.md
+│   ├───.circleci/
+│   ├───.devcontainer/
+│   ├───.git/...
+│   ├───.github/
+│   ├───.venv/...
+│   ├───ci_cd/
+│   ├───cookbook/
+│   ├───db_scripts/
+│   ├───deploy/
+│   ├───docker/
+│   ├───docs/
+│   ├───enterprise/
+│   ├───litellm/
+│   ├───litellm-js/
+│   ├───litellm-proxy-extras/
+│   ├───scripts/
+│   ├───tests/
+│   └───ui/
+├───node_modules/...
+├───packages/
+│   ├───a2a-server/
+│   ├───cli/
+│   ├───core/
+│   ├───test-utils/
+│   └───vscode-ide-companion/
+├───schemas/
+│   └───settings.schema.json
+├───scripts/
+│   ├───build_package.js
+│   ├───build_sandbox.js
+│   ├───build_vscode_companion.js
+│   ├───build.js
+│   ├───check-build-status.js
+│   ├───check-lockfile.js
+│   ├───clean.js
+│   ├───copy_bundle_assets.js
+│   ├───copy_files.js
+│   ├───create_alias.sh
+│   ├───deflake.js
+│   ├───generate-git-commit-info.js
+│   ├───generate-keybindings-doc.ts
+│   ├───generate-settings-doc.ts
+│   ├───generate-settings-schema.ts
+│   ├───get-release-version.js
+│   ├───lint.js
+│   ├───local_telemetry.js
+│   ├───pre-commit.js
+│   ├───prepare-github-release.js
+│   ├───prepare-package.js
+│   ├───sandbox_command.js
+│   ├───...
+│   └───...
+└───third_party/
 Important Rules:
 * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
 * Work systematically using available tools to complete your task.

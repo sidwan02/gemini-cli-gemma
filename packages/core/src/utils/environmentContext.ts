@@ -6,7 +6,7 @@
 
 import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
-// import { getFolderStructure } from './getFolderStructure.js';
+import { getFolderStructure } from './getFolderStructure.js';
 
 /**
  * Generates a string describing the current workspace directories and their structures.
@@ -15,19 +15,22 @@ import type { Config } from '../config/config.js';
  */
 export async function getDirectoryContextString(
   config: Config,
+  model?: string,
 ): Promise<string> {
   const workspaceContext = config.getWorkspaceContext();
   const workspaceDirectories = workspaceContext.getDirectories();
 
-  // const folderStructures = await Promise.all(
-  //   workspaceDirectories.map((dir) =>
-  //     getFolderStructure(dir, {
-  //       fileService: config.getFileService(),
-  //     }),
-  //   ),
-  // );
-
-  // const folderStructure = folderStructures.join('\n');
+  let folderStructure = '';
+  if (model === 'gemma3:12b') {
+    const folderStructures = await Promise.all(
+      workspaceDirectories.map((dir) =>
+        getFolderStructure(dir, {
+          fileService: config.getFileService(),
+        }),
+      ),
+    );
+    folderStructure = folderStructures.join('\n');
+  }
 
   let workingDirPreamble: string;
   if (workspaceDirectories.length === 1) {
@@ -37,11 +40,14 @@ export async function getDirectoryContextString(
     workingDirPreamble = `I'm currently working in the following directories:\n${dirList}. I have access to these directories and their subdirectories.`;
   }
 
-  return workingDirPreamble + '\n';
-  //   return `${workingDirPreamble}
-  // Here is the folder structure of the current working directories:
+  if (!folderStructure) {
+    return workingDirPreamble + '\n';
+  }
+  return `${workingDirPreamble}
+Here is the folder structure of the current working directories:
 
-  // ${folderStructure}`;
+${folderStructure}
+`;
 }
 
 /**

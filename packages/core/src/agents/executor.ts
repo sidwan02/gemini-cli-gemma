@@ -1431,6 +1431,63 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     return toolsList;
   }
 
+  /**
+   * Formats tool declarations for Gemma's function calling format.
+   * This involves removing descriptions from parameters and converting
+   * `parametersJsonSchema` to `parameters`.
+   */
+  private _prepareGemmaToolCode(tools: FunctionDeclaration[]): string {
+    // Need the tool declaration to be of a certain format for gemma: https://ai.google.dev/gemma/docs/capabilities/function-calling#function-definition
+    return `${JSON.stringify(
+      tools.map((tool) => {
+        type ToolWithBothParams = FunctionDeclaration & {
+          parametersJsonSchema?: unknown;
+        };
+        // Create a mutable copy of the tool to avoid modifying the original
+        const newTool: ToolWithBothParams = { ...tool };
+
+        // If 'parametersJsonSchema' exists, convert it to 'parameters'
+        if ('parametersJsonSchema' in newTool) {
+          newTool.parameters = newTool.parametersJsonSchema as Schema;
+          delete newTool.parametersJsonSchema;
+        }
+
+        // Process parameters to remove any parameter named 'description'
+        if (newTool.parameters && newTool.parameters.properties) {
+          const newProperties: Record<string, Schema> = {};
+          for (const propName in newTool.parameters.properties) {
+            if (
+              Object.prototype.hasOwnProperty.call(
+                newTool.parameters.properties,
+                propName,
+              )
+            ) {
+              // Only include properties that are not named 'description'
+              if (propName !== 'description') {
+                newProperties[propName] =
+                  newTool.parameters.properties[propName];
+              }
+            }
+          }
+          newTool.parameters = {
+            ...newTool.parameters,
+            properties: newProperties,
+          };
+
+          // Also update the 'required' array if 'description' was listed as required
+          if (newTool.parameters.required) {
+            newTool.parameters.required = newTool.parameters.required.filter(
+              (reqProp) => reqProp !== 'description',
+            );
+          }
+        }
+        return newTool;
+      }),
+      null,
+      2,
+    )}`;
+  }
+
   /** Builds the system prompt from the agent definition and inputs. */
   private async buildSystemPrompt(inputs: AgentInputs): Promise<string> {
     const { promptConfig } = this.definition;
@@ -1446,63 +1503,41 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (promptConfig.systemPrompt.includes('${tool_code}')) {
       const tools = this.prepareToolsList();
-      // Need the tool declaration to be of a certain format for gemma: https://ai.google.dev/gemma/docs/capabilities/function-calling#function-definition
-      const toolCode = `${JSON.stringify(
-        tools.map((tool) => {
-          type ToolWithBothParams = FunctionDeclaration & {
-            parametersJsonSchema?: unknown;
-          };
-          // Create a mutable copy of the tool to avoid modifying the original
-          const newTool: ToolWithBothParams = { ...tool };
-
-          // If 'parametersJsonSchema' exists, convert it to 'parameters'
-          if ('parametersJsonSchema' in newTool) {
-            newTool.parameters = newTool.parametersJsonSchema as Schema;
-            delete newTool.parametersJsonSchema;
-          }
-
-          // Process parameters to remove any parameter named 'description'
-          if (newTool.parameters && newTool.parameters.properties) {
-            const newProperties: Record<string, Schema> = {};
-            for (const propName in newTool.parameters.properties) {
-              if (
-                Object.prototype.hasOwnProperty.call(
-                  newTool.parameters.properties,
-                  propName,
-                )
-              ) {
-                // Only include properties that are not named 'description'
-                if (propName !== 'description') {
-                  newProperties[propName] =
-                    newTool.parameters.properties[propName];
-                }
-              }
-            }
-            newTool.parameters = {
-              ...newTool.parameters,
-              properties: newProperties,
-            };
-
-            // Also update the 'required' array if 'description' was listed as required
-            if (newTool.parameters.required) {
-              newTool.parameters.required = newTool.parameters.required.filter(
-                (reqProp) => reqProp !== 'description',
-              );
-            }
-          }
-          return newTool;
-        }),
-        null,
-        2,
-      )}`;
+      const toolCode = this._prepareGemmaToolCode(tools);
       templateInputs['tool_code'] = toolCode;
+    }
+
+    debugLogger.log(
+      '[AgentExecutor] Preparing system prompt with template inputs: ',
+      templateInputs,
+    );
+
+    // TODO: verify this reminder works with tool call injection.
+    if (
+      promptConfig.reminder &&
+      promptConfig.reminder.includes('${tool_code}')
+    ) {
+      debugLogger.log(
+        '[AgentExecutor] Preparing tool code for reminder template.',
+      );
+      const reminderTemplateInputs: Record<string, unknown> = {};
+      const tools = this.prepareToolsList();
+      const toolCode = this._prepareGemmaToolCode(tools);
+      reminderTemplateInputs['tool_code'] = toolCode;
+      promptConfig.reminder = templateString(
+        promptConfig.reminder,
+        reminderTemplateInputs,
+      );
     }
 
     // Inject user inputs and tool code (if applicable) into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, templateInputs);
 
     // Append environment context (CWD and folder structure).
-    const dirContext = await getDirectoryContextString(this.runtimeContext);
+    const dirContext = await getDirectoryContextString(
+      this.runtimeContext,
+      this.definition.modelConfig.model,
+    );
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
 
     // Append standard rules for non-interactive execution.

@@ -5,7 +5,8 @@
     },
     "gemmaSubagentSettings": {
       "enabled": false,
-      "model": "gemma3n:e4b"
+      // "model": "gemma3n:e4b"
+      "model": "gemma3:12b"
     },
     "buildAndTestSettings": {
       "enabled": true,

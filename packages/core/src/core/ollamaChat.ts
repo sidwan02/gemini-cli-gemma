@@ -145,6 +145,7 @@ export class OllamaChat {
           lastMessage.content += '\n\n' + this.promptConfig.reminder;
         }
         // lastMessage.content += `\n\n${this.promptConfig.directive}`;
+        // lastMessage.content += `\n\n${this.promptConfig.directive}`;
       }
       await fs.writeFile(
         'subagent_last_message_content.txt',
