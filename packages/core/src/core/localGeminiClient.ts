@@ -1,0 +1,87 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { GoogleGenAI } from '@google/genai';
+import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import type { Content } from './ollamaChat.js';
+
+/**
+ * A client for making single, non-streaming calls to a local Gemini-compatible API
+ * and expecting a JSON response.
+ */
+export class LocalGeminiClient {
+  private readonly host: string;
+  private readonly model: string;
+  private readonly client: GoogleGenAI;
+
+  constructor(config: Config) {
+    const useGemmaRoutingSettings = config.getUseGemmaRoutingSettings();
+    this.host = useGemmaRoutingSettings?.host || 'http://localhost:8000';
+    this.model = useGemmaRoutingSettings?.model || 'Gemma3-1B-IT';
+
+    if (!this.model.toLowerCase().startsWith('gemma')) {
+      throw new Error(
+        `Invalid model name: ${this.model}. Model name must start with "Gemma" (case-insensitive).`,
+      );
+    }
+
+    this.client = new GoogleGenAI({
+      apiKey: 'no-api-key-needed',
+      httpOptions: {
+        baseUrl: this.host,
+      },
+    });
+  }
+
+  /**
+   * Sends a prompt to the local Gemini model and expects a JSON object in response.
+   * @param contents The history and current prompt.
+   * @param systemInstruction The system prompt.
+   * @returns A promise that resolves to the parsed JSON object.
+   */
+  async generateJson(
+    contents: Content[],
+    systemInstruction: string,
+  ): Promise<object> {
+    debugLogger.log(
+      `[LocalGeminiClient] Sending request to ${this.host} for model ${this.model}`,
+    );
+
+    const geminiContents = contents.map((c) => ({
+      role: c.role === 'model' ? 'model' : 'user',
+      parts: c.parts.map((p) => ({ text: p.text })),
+    }));
+
+    try {
+      const result = await this.client.models.generateContent({
+        model: this.model,
+        contents: geminiContents,
+        config: {
+          responseMimeType: 'application/json',
+          systemInstruction: systemInstruction
+            ? { parts: [{ text: systemInstruction }] }
+            : undefined,
+        },
+      });
+
+      const text = result.text;
+      if (!text) {
+        throw new Error(
+          'Invalid response from Local Gemini API: No text found',
+        );
+      }
+
+      return JSON.parse(text);
+    } catch (error) {
+      debugLogger.error(
+        `[LocalGeminiClient] Failed to generate content:`,
+        error,
+      );
+      throw error;
+    }
+  }
+}
