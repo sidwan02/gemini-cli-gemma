@@ -142,6 +142,7 @@ export interface UseModelRouterSettings {
     enabled?: boolean;
     model?: string;
     host?: string;
+    provider?: 'ollama' | 'litert-lm';
   };
 }
 
@@ -558,6 +559,7 @@ export class Config {
         host:
           params.useModelRouter?.useGemmaRouting?.host ??
           'http://localhost:11434',
+        provider: params.useModelRouter?.useGemmaRouting?.provider ?? 'ollama',
       },
     };
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
