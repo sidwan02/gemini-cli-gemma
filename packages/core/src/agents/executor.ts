@@ -7,7 +7,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { Type } from '@google/genai';
-import type { Config } from '../config/config.js';
+import type {
+  Config,
+  SubagentSummarizeToolOutputSettings,
+} from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { OllamaChat } from '../core/ollamaChat.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
@@ -1346,8 +1349,29 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         const toolResponsePartsToReturn: GeminiPart[] =
           toolResponse.responseParts;
 
-        // Apply summarization if enabled and content is present
-        if (this.definition.runConfig.summarizeToolOutput) {
+        // Apply summarization if the specific subagent config has it enabled.
+        const agentName = this.definition.name;
+        let agentSummarizeConfig:
+          | SubagentSummarizeToolOutputSettings
+          | undefined;
+
+        if (agentName === 'codebase_investigator') {
+          agentSummarizeConfig =
+            this.runtimeContext.getCodebaseInvestigatorSettings()
+              .subagentSummarizeToolOutput;
+        } else if (agentName === 'gemma_agent') {
+          agentSummarizeConfig =
+            this.runtimeContext.getGemmaSubagentSettings()
+              .subagentSummarizeToolOutput;
+        } else if (agentName === 'build_and_test_agent') {
+          agentSummarizeConfig =
+            this.runtimeContext.getBuildAndTestSettings()
+              .subagentSummarizeToolOutput;
+        }
+
+        // IMPORTANT: Only summarize if the agent-specific config is present and enabled.
+        // Do not fall back to a global setting.
+        if ((agentSummarizeConfig as { enabled?: boolean })?.enabled) {
           const summary = await this.summarizationService.summarize(
             toolResponse.responseParts,
             this.definition.modelConfig,
@@ -1358,8 +1382,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             );
             for (const part of toolResponsePartsToReturn) {
               if ('functionResponse' in part && part.functionResponse) {
-                // This is a bit awkward, but `response` is just `object`
-                // in the type, so we have to cast.
                 const responseObject = part.functionResponse.response as {
                   llmContent?: unknown;
                 };
@@ -1370,6 +1392,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
               }
             }
           }
+        } else {
+          debugLogger.log(
+            `[AgentExecutor] Skipping summarization for tool: ${functionCall.name} (ID: ${callId})`,
+          );
         }
 
         return toolResponsePartsToReturn;

@@ -8,6 +8,8 @@ import type { OllamaModelConfig, ModelConfig } from '../agents/types.js';
 import { type Part as OllamaPart, OllamaChat } from '../core/ollamaChat.js';
 import type { Part as GeminiPart } from '@google/genai';
 import { StreamEventType } from '../core/geminiChat.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import * as fs from 'node:fs/promises';
 
 const SUMMARIZER_SYSTEM_PROMPT = `You are a text summarizer. Your sole purpose is to receive text and provide a concise, factual summary of it. Do not add any commentary or analysis. Focus on the key information presented in the text.`;
 
@@ -18,6 +20,9 @@ export class SummarizationService {
     tollResponseParts: GeminiPart[],
     modelConfig: OllamaModelConfig | ModelConfig,
   ): Promise<string | null> {
+    debugLogger.log(
+      `[SummarizationService] Starting summarization using model: ${modelConfig.model}`,
+    );
     if ('host' in modelConfig) {
       const userParts: OllamaPart[] = [];
       for (const part of tollResponseParts) {
@@ -56,6 +61,18 @@ export class SummarizationService {
             textResponse = text;
           }
         }
+      }
+
+      try {
+        await fs.writeFile('summarized_tool_output.txt', textResponse);
+        debugLogger.log(
+          '[DEBUG] Summarized tool output saved to summarized_tool_output.txt',
+        );
+      } catch (error) {
+        debugLogger.error(
+          '[DEBUG] Failed to save summarized tool output to summarized_tool_output.txt:',
+          error,
+        );
       }
 
       // Just return the raw text response from the summarizer model.

@@ -102,6 +102,10 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export interface SubagentSummarizeToolOutputSettings {
+  enabled?: boolean;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
@@ -122,18 +126,21 @@ export interface CodebaseInvestigatorSettings {
   maxTimeMinutes?: number;
   thinkingBudget?: number;
   model?: string;
+  subagentSummarizeToolOutput?: SubagentSummarizeToolOutputSettings;
 }
 
 export interface GemmaSubagentSettings {
   enabled?: boolean;
   model?: string;
   host?: string;
+  subagentSummarizeToolOutput?: SubagentSummarizeToolOutputSettings;
 }
 
 export interface BuildAndTestSettings {
   enabled?: boolean;
   model?: string;
   host?: string;
+  subagentSummarizeToolOutput?: SubagentSummarizeToolOutputSettings;
 }
 
 export interface UseModelRouterSettings {
@@ -584,11 +591,15 @@ export class Config {
       enabled: params.gemmaSubagentSettings?.enabled ?? false,
       model: params.gemmaSubagentSettings?.model ?? 'gemma3n:e2b',
       host: params.gemmaSubagentSettings?.host ?? 'http://localhost:11434',
+      subagentSummarizeToolOutput:
+        params.gemmaSubagentSettings?.subagentSummarizeToolOutput,
     };
     this.buildAndTestSettings = {
       enabled: params.buildAndTestSettings?.enabled ?? false,
       model: params.buildAndTestSettings?.model ?? 'gemma3n:e4b',
       host: params.buildAndTestSettings?.host ?? 'http://localhost:11434',
+      subagentSummarizeToolOutput:
+        params.buildAndTestSettings?.subagentSummarizeToolOutput,
     };
     // debugLogger.log(
     //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,

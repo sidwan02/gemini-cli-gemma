@@ -6,13 +6,15 @@
     "gemmaSubagentSettings": {
       "enabled": false,
       // "model": "gemma3n:e4b"
-      "model": "gemma3:12b"
+      "model": "gemma3:12b",
+      "subagentSummarizeToolOutput": { "enabled": false }
     },
     "buildAndTestSettings": {
       "enabled": true,
       // "model": "gemma3n:e4b"
-      "model": "gemma3:12b"
+      "model": "gemma3:12b",
       // "model": "gemma3:12b"
+      "subagentSummarizeToolOutput": { "enabled": true }
     },
     "useModelRouter": {
       "useGemmaRouting": {
