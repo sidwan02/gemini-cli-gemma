@@ -191,4 +191,6 @@ export interface RunConfig {
   max_time_minutes: number;
   /** The maximum number of conversational turns. */
   max_turns?: number;
+  /** Whether to summarize tool output before sending it to the model. */
+  summarizeToolOutput?: boolean;
 }

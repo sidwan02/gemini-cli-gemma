@@ -71,6 +71,8 @@ import {
   // DOUBLE_INTERRUPT,
 } from '../common/abort-signal-manager.js';
 
+import { SummarizationService } from '../services/summarizer.js';
+
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
@@ -103,6 +105,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly runtimeContext: Config;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
+  private readonly summarizationService: SummarizationService;
   private hasFailedCompressionAttempt = false;
 
   /**
@@ -181,6 +184,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     this.toolRegistry = toolRegistry;
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
+    this.summarizationService = new SummarizationService();
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -1339,7 +1343,36 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           });
         }
 
-        return toolResponse.responseParts;
+        const toolResponsePartsToReturn: GeminiPart[] =
+          toolResponse.responseParts;
+
+        // Apply summarization if enabled and content is present
+        if (this.definition.runConfig.summarizeToolOutput) {
+          const summary = await this.summarizationService.summarize(
+            toolResponse.responseParts,
+            this.definition.modelConfig,
+          );
+          if (summary) {
+            debugLogger.log(
+              `[AgentExecutor] Summarized output for tool: ${functionCall.name} (ID: ${callId})`,
+            );
+            for (const part of toolResponsePartsToReturn) {
+              if ('functionResponse' in part && part.functionResponse) {
+                // This is a bit awkward, but `response` is just `object`
+                // in the type, so we have to cast.
+                const responseObject = part.functionResponse.response as {
+                  llmContent?: unknown;
+                };
+                if (responseObject.llmContent) {
+                  responseObject.llmContent = summary;
+                  break; // Assume only one functionResponse part
+                }
+              }
+            }
+          }
+        }
+
+        return toolResponsePartsToReturn;
       })();
 
       toolExecutionPromises.push(executionPromise);
