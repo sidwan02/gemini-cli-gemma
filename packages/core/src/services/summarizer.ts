@@ -11,7 +11,26 @@ import { StreamEventType } from '../core/geminiChat.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import * as fs from 'node:fs/promises';
 
-const SUMMARIZER_SYSTEM_PROMPT = `You are a text summarizer. Your sole purpose is to receive text and provide a concise, factual summary of it. Do not add any commentary or analysis. Focus on the key information presented in the text.`;
+const SUMMARIZER_SYSTEM_PROMPT = `## Role
+You are an expert Tool Call Output Summarizer.
+
+## Task Definition
+Your task is to summarize a given tool call output. The summary must specifically highlight how the tool call output contributes to or addresses the user's overall objective.
+
+## Instruction
+When generating the summary, focus solely on the information within the \`toolcall\` that directly addresses or fulfills aspects of the \`objective\`. **The summary must be as exhaustive as possible, capturing every relevant detail from the tool call, and must be presented as a bulleted list.** Do not include extraneous details or interpret the tool call beyond its direct relevance to the objective.
+
+## Response Format Constraints
+The response **must be a bulleted list** containing **up to 20 points** (maximum). Each bullet point should be concise. DO NOT include any explicit explanations, reasoning, or thinking process outside of the bullet points. Your output must ONLY be the bulleted summary.`;
+
+const SUMMARIZER_USER_PROMPT = `## Input
+User's Objective: {{objective}}
+Tool Call Output: {{toolcall}}
+
+## Output Reminder
+Take a deep breath, read the instructions again, read the inputs again. Each instruction is crucial and must be executed with utmost care and attention to detail.
+
+Summary:`;
 
 export class SummarizationService {
   constructor() {}
@@ -19,6 +38,7 @@ export class SummarizationService {
   async summarize(
     tollResponseParts: GeminiPart[],
     modelConfig: OllamaModelConfig | ModelConfig,
+    objective: string,
   ): Promise<string | null> {
     debugLogger.log(
       `[SummarizationService] Starting summarization using model: ${modelConfig.model}`,
@@ -34,13 +54,34 @@ export class SummarizationService {
         }
       }
 
+      try {
+        await fs.writeFile(
+          'summarize_tool_prompt.txt',
+          JSON.stringify(userParts, null, 2),
+        );
+        debugLogger.log(
+          '[DEBUG] Summarized tool output saved to summarize_tool_prompt.txt',
+        );
+      } catch (error) {
+        debugLogger.error(
+          '[DEBUG] Failed to save summarized tool output to summarize_tool_prompt.txt:',
+          error,
+        );
+      }
+
       const chat = new OllamaChat(
         modelConfig as OllamaModelConfig,
         SUMMARIZER_SYSTEM_PROMPT,
       );
 
+      const toolCallJson = JSON.stringify(userParts);
+      const userPrompt = SUMMARIZER_USER_PROMPT.replace(
+        '{{objective}}',
+        objective,
+      ).replace('{{toolcall}}', toolCallJson);
+
       const messageParams = {
-        message: userParts,
+        message: [{ text: userPrompt }],
       };
 
       const responseStream = await chat.sendMessageStream(

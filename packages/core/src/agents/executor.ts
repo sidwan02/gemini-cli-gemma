@@ -210,6 +210,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     turnCounter: number,
     turnSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
+    objective: string,
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
@@ -312,7 +313,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const { nextMessage, submittedOutput, taskCompleted } =
-      await this.processFunctionCalls(functionCalls, turnSignal, promptId);
+      await this.processFunctionCalls(
+        functionCalls,
+        turnSignal,
+        promptId,
+        objective,
+      );
 
     if (taskCompleted) {
       let finalResult = submittedOutput ?? 'Task completed successfully.';
@@ -419,6 +425,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         turnCounter, // This will be the "last" turn number
         combinedSignal,
         graceTimeoutController.signal, // Pass grace signal to identify a *grace* timeout
+        // The objective for a recovery turn is to complete the task,
+        // so we'll pass a concise instruction to that effect.
+        `Complete the interrupted task with your best answer, explaining the interruption.`, // Objective for recovery
       );
 
       if (
@@ -495,7 +504,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       tools = this.prepareToolsList();
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
-        : 'Get Started!';
+        : inputs['objective'] !== undefined
+          ? (inputs['objective'] as string)
+          : 'Get Started!';
+
       let currentMessage: GeminiContent = {
         role: 'user',
         parts: [{ text: query }],
@@ -529,6 +541,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           turnCounter++,
           combinedSignal,
           timeoutController.signal,
+          query, // Pass the objective here
         );
 
         if (turnResult.status === 'stop') {
@@ -1104,6 +1117,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
+    objective: string,
   ): Promise<{
     nextMessage: GeminiContent;
     submittedOutput: string | null;
@@ -1375,6 +1389,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           const summary = await this.summarizationService.summarize(
             toolResponse.responseParts,
             this.definition.modelConfig,
+            objective,
           );
           if (summary) {
             debugLogger.log(
