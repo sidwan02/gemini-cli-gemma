@@ -169,6 +169,41 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     );
   }
 
+  private async _writeChatHistoryToFile(
+    chat: GeminiChat | OllamaChat,
+  ): Promise<void> {
+    const history = await chat.getHistory();
+    let fileContent = 'Chat History\n\n';
+    for (const message of history) {
+      let content = '';
+      for (const part of message?.parts ?? []) {
+        if ('text' in part && part.text) {
+          content += part.text;
+        }
+        if ('functionCall' in part && part.functionCall) {
+          content += `Function Call: ${
+            part.functionCall.name
+          }\nArguments: ${JSON.stringify(
+            part.functionCall.args ?? {},
+            null,
+            2,
+          )}\n`;
+        }
+        if ('functionResponse' in part && part.functionResponse) {
+          content += `Function Response: ${
+            part.functionResponse.name
+          }\nOutput: ${JSON.stringify(
+            part.functionResponse.response ?? {},
+            null,
+            2,
+          )}\n`;
+        }
+      }
+      fileContent += `--- ROLE: ${message.role} ---\n${content}\n---\n`;
+    }
+    await fs.writeFile(`chat_history.txt`, fileContent);
+  }
+
   /**
    * Constructs a new AgentExecutor instance.
    *
@@ -226,6 +261,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       async () =>
         this.callModel(chat, currentMessage, tools, turnSignal, promptId),
     );
+
+    await this._writeChatHistoryToFile(chat);
 
     if (turnSignal.aborted) {
       debugLogger.log(
@@ -514,6 +551,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       while (true) {
+        await this._writeChatHistoryToFile(chat);
+
         debugLogger.log(
           `[AgentExecutor] Starting turn ${turnCounter} for agent ${this.agentId}`,
         );
@@ -543,6 +582,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           timeoutController.signal,
           query, // Pass the objective here
         );
+
+        await this._writeChatHistoryToFile(chat);
 
         if (turnResult.status === 'stop') {
           terminateReason = turnResult.terminateReason;
@@ -1395,15 +1436,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             debugLogger.log(
               `[AgentExecutor] Summarized output for tool: ${functionCall.name} (ID: ${callId})`,
             );
+            // Replace the original tool output with the summary.
             for (const part of toolResponsePartsToReturn) {
               if ('functionResponse' in part && part.functionResponse) {
-                const responseObject = part.functionResponse.response as {
-                  llmContent?: unknown;
+                // By replacing the entire response object, we don't have to
+                // worry about what the original properties were (e.g. 'result'
+                // vs 'output'). The model will see a generic response containing
+                // the summarized text.
+                part.functionResponse.response = {
+                  summary,
                 };
-                if (responseObject.llmContent) {
-                  responseObject.llmContent = summary;
-                  break; // Assume only one functionResponse part
-                }
+                break; // Assume only one functionResponse part
               }
             }
           }
