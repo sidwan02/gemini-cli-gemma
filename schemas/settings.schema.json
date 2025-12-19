@@ -1199,6 +1199,97 @@
               "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-pro`",
               "default": "gemini-2.5-pro",
               "type": "string"
+            },
+            "useToolCallService": {
+              "title": "Use Tool Call Service",
+              "description": "Enable the Tool Call Service for two-step tool calling.",
+              "markdownDescription": "Enable the Tool Call Service for two-step tool calling.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "gemmaSubagentSettings": {
+          "title": "Gemma Subagent Settings",
+          "description": "Configuration for the Gemma subagent.",
+          "markdownDescription": "Configuration for the Gemma subagent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Gemma Subagent",
+              "description": "Enable the Gemma subagent.",
+              "markdownDescription": "Enable the Gemma subagent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "model": {
+              "title": "Model",
+              "description": "The model to use for the Gemma subagent.",
+              "markdownDescription": "The model to use for the Gemma subagent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3:12b`",
+              "default": "gemma3:12b",
+              "type": "string"
+            },
+            "subagentSummarizeToolOutput": {
+              "title": "Summarize Tool Output",
+              "description": "Enables or disables summarization of tool output for the Gemma subagent.",
+              "markdownDescription": "Enables or disables summarization of tool output for the Gemma subagent.\n\n- Category: `Experimental`\n- Requires restart: `no`",
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "useToolCallService": {
+              "title": "Use Tool Call Service",
+              "description": "Enable the Tool Call Service for two-step tool calling.",
+              "markdownDescription": "Enable the Tool Call Service for two-step tool calling.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "buildAndTestSettings": {
+          "title": "Build and Test Settings",
+          "description": "Configuration for the Build and Test agent.",
+          "markdownDescription": "Configuration for the Build and Test agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Build and Test Agent",
+              "description": "Enable the Build and Test agent.",
+              "markdownDescription": "Enable the Build and Test agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "model": {
+              "title": "Model",
+              "description": "The model to use for the Build and Test agent.",
+              "markdownDescription": "The model to use for the Build and Test agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3:12b`",
+              "default": "gemma3:12b",
+              "type": "string"
+            },
+            "subagentSummarizeToolOutput": {
+              "title": "Summarize Tool Output",
+              "description": "Enables or disables summarization of tool output for the Build and Test agent.",
+              "markdownDescription": "Enables or disables summarization of tool output for the Build and Test agent.\n\n- Category: `Experimental`\n- Requires restart: `no`",
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "useToolCallService": {
+              "title": "Use Tool Call Service",
+              "description": "Enable the Tool Call Service for two-step tool calling.",
+              "markdownDescription": "Enable the Tool Call Service for two-step tool calling.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false

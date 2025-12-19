@@ -127,6 +127,7 @@ export interface CodebaseInvestigatorSettings {
   thinkingBudget?: number;
   model?: string;
   subagentSummarizeToolOutput?: SubagentSummarizeToolOutputSettings;
+  useToolCallService?: boolean;
 }
 
 export interface GemmaSubagentSettings {
@@ -134,6 +135,7 @@ export interface GemmaSubagentSettings {
   model?: string;
   host?: string;
   subagentSummarizeToolOutput?: SubagentSummarizeToolOutputSettings;
+  useToolCallService?: boolean;
 }
 
 export interface BuildAndTestSettings {
@@ -141,6 +143,7 @@ export interface BuildAndTestSettings {
   model?: string;
   host?: string;
   subagentSummarizeToolOutput?: SubagentSummarizeToolOutputSettings;
+  useToolCallService?: boolean;
 }
 
 export interface UseModelRouterSettings {
@@ -588,6 +591,8 @@ export class Config {
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+      useToolCallService:
+        params.codebaseInvestigatorSettings?.useToolCallService ?? false,
     };
     this.gemmaSubagentSettings = {
       enabled: params.gemmaSubagentSettings?.enabled ?? false,
@@ -595,6 +600,8 @@ export class Config {
       host: params.gemmaSubagentSettings?.host ?? 'http://localhost:11434',
       subagentSummarizeToolOutput:
         params.gemmaSubagentSettings?.subagentSummarizeToolOutput,
+      useToolCallService:
+        params.gemmaSubagentSettings?.useToolCallService ?? false,
     };
     this.buildAndTestSettings = {
       enabled: params.buildAndTestSettings?.enabled ?? false,
@@ -602,6 +609,8 @@ export class Config {
       host: params.buildAndTestSettings?.host ?? 'http://localhost:11434',
       subagentSummarizeToolOutput:
         params.buildAndTestSettings?.subagentSummarizeToolOutput,
+      useToolCallService:
+        params.buildAndTestSettings?.useToolCallService ?? false,
     };
     // debugLogger.log(
     //   `[DEBUG] Codebase Investigator Settings: ${JSON.stringify(this.codebaseInvestigatorSettings)}`,

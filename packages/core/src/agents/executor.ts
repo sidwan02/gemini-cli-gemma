@@ -75,6 +75,7 @@ import {
 } from '../common/abort-signal-manager.js';
 
 import { SummarizationService } from '../services/summarizer.js';
+import { ToolCallService } from '../services/toolCallService.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -109,6 +110,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
   private readonly summarizationService: SummarizationService;
+  private readonly toolCallService: ToolCallService;
   private hasFailedCompressionAttempt = false;
   private systemInstruction?: string;
 
@@ -227,6 +229,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.summarizationService = new SummarizationService();
+    this.toolCallService = new ToolCallService(this.toolRegistry);
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -359,6 +362,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         turnSignal,
         promptId,
         objective,
+        chat,
       );
 
     if (taskCompleted) {
@@ -1163,11 +1167,45 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
     objective: string,
+    chat: GeminiChat | OllamaChat,
   ): Promise<{
     nextMessage: GeminiContent;
     submittedOutput: string | null;
     taskCompleted: boolean;
   }> {
+    const agentName = this.definition.name;
+    let useToolCallService = false;
+    if (agentName === 'codebase_investigator') {
+      useToolCallService =
+        !!this.runtimeContext.getCodebaseInvestigatorSettings()
+          .useToolCallService;
+    } else if (agentName === 'gemma_agent') {
+      useToolCallService =
+        !!this.runtimeContext.getGemmaSubagentSettings().useToolCallService;
+    } else if (agentName === 'build_and_test_agent') {
+      useToolCallService =
+        !!this.runtimeContext.getBuildAndTestSettings().useToolCallService;
+    }
+
+    if (useToolCallService) {
+      const completeFunctionCalls: FunctionCall[] = [];
+      for (const functionCall of functionCalls) {
+        if (functionCall.name) {
+          const tool = this.toolRegistry.getTool(functionCall.name);
+          if (tool) {
+            const completeFunctionCall =
+              await this.toolCallService.generateToolCall(
+                functionCall.name,
+                chat,
+                this.definition.modelConfig,
+              );
+            completeFunctionCalls.push(completeFunctionCall);
+          }
+        }
+      }
+      functionCalls = completeFunctionCalls;
+    }
+
     debugLogger.log(
       `[AgentExecutor] Processing ${functionCalls.length} function calls.`,
     );
@@ -1622,10 +1660,49 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       templateInputs['directive'] = promptConfig.directive;
     }
 
-    if (promptConfig.systemPrompt.includes('${tool_code}')) {
+    if (
+      promptConfig.systemPrompt.includes('${tool_code}') ||
+      promptConfig.systemPrompt.includes('${tools_list}')
+    ) {
       const tools = this.prepareToolsList();
-      const toolCode = this._prepareGemmaToolCode(tools);
-      templateInputs['tool_code'] = toolCode;
+      let useToolCallService = false;
+      const agentName = this.definition.name;
+      if (agentName === 'codebase_investigator') {
+        useToolCallService =
+          !!this.runtimeContext.getCodebaseInvestigatorSettings()
+            .useToolCallService;
+      } else if (agentName === 'gemma_agent') {
+        useToolCallService =
+          !!this.runtimeContext.getGemmaSubagentSettings().useToolCallService;
+      } else if (agentName === 'build_and_test_agent') {
+        useToolCallService =
+          !!this.runtimeContext.getBuildAndTestSettings().useToolCallService;
+      }
+
+      if (useToolCallService) {
+        const toolNames = tools.map((tool) => tool.name).join(', ');
+        templateInputs['tools_list'] = toolNames;
+        if (promptConfig.directive) {
+          const newDirective = promptConfig.directive
+            .replace(
+              /Your response must \*ONLY\* contain a one-line explanation of your rationale, followed by the tool call in JSON format\./,
+              'Your response must *ONLY* contain a one-line explanation of your rationale, followed by the tool choice in JSON format.',
+            )
+            .replace(
+              /\{[\s\S]*?\}/,
+              `{
+  "name": "tool_name"
+}`,
+            );
+          templateInputs['directive'] = newDirective;
+        }
+      } else {
+        const toolCode = this._prepareGemmaToolCode(tools);
+        templateInputs['tools_list'] = toolCode;
+        if (promptConfig.directive) {
+          templateInputs['directive'] = promptConfig.directive;
+        }
+      }
     }
 
     debugLogger.log(

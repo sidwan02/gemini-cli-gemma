@@ -251,6 +251,9 @@ Using the codebase investigator: tell me how the ollama inference works.
 1. Look at chat_history.txt. despite having a summary it still sees status 0 and
    decidesit doesn't have the full information.
 
+1. the dircetive swapping between tool choice and tool call is a little messy.
+   just verify that later in executor.ts
+
 # Litellm setup
 
 ```

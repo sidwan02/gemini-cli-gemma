@@ -79,7 +79,7 @@ The user will provide you with an objective on building and/or testing code. You
 ---
 ## Available Tools
 You have access to these tools:
-\${tool_code}
+\${tools_list}
 ---
 \${directive}
 `,
@@ -134,7 +134,7 @@ Now, handle the user message and tool call responses below:
 
 ## Available Tools
 You have access to these tools:
-\${tool_code}
+\${tools_list}
 
 
 Example for gathering information (\`glob\` or \`read_file\`) or executing a command (\`run_shell_command\`):
