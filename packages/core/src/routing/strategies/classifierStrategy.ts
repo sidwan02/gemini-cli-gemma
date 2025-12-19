@@ -5,6 +5,7 @@
  */
 
 import { OllamaClient } from '../../core/ollamaClient.js';
+import { LocalGeminiClient } from '../../core/localGeminiClient.js';
 import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
@@ -190,8 +191,10 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       let jsonResponse;
       if (config.getUseGemmaRoutingSettings()?.enabled) {
-        debugLogger.log(`[Routing] Using OllamaClient for classifier routing.`);
-        const ollamaClient = new OllamaClient(config);
+        const settings = config.getUseGemmaRoutingSettings();
+        const provider = settings?.provider ?? 'ollama';
+        debugLogger.log(`[Routing] Using ${provider} for classifier routing.`);
+
         const ollamaHistory = finalHistory
           .map(toOllamaContent)
           .filter((c): c is OllamaContent => c !== null);
@@ -202,12 +205,19 @@ export class ClassifierStrategy implements RoutingStrategy {
           ollamaHistory.push(ollamaRequest);
         }
 
-        // debugLogger.log(`[Routing] ollamaHistory:`, ollamaHistory);
-
-        jsonResponse = await ollamaClient.generateJson(
-          ollamaHistory,
-          CLASSIFIER_SYSTEM_PROMPT,
-        );
+        if (provider === 'litert-lm') {
+          const client = new LocalGeminiClient(config);
+          jsonResponse = await client.generateJson(
+            ollamaHistory,
+            CLASSIFIER_SYSTEM_PROMPT,
+          );
+        } else {
+          const ollamaClient = new OllamaClient(config);
+          jsonResponse = await ollamaClient.generateJson(
+            ollamaHistory,
+            CLASSIFIER_SYSTEM_PROMPT,
+          );
+        }
       } else {
         jsonResponse = await baseLlmClient.generateJson({
           modelConfigKey: { model: 'classifier' },

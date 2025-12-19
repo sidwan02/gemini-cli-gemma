@@ -21,8 +21,13 @@ import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 
+import type { OllamaClient as OllamaClientType } from '../../core/ollamaClient.js';
+import type { LocalGeminiClient as LocalGeminiClientType } from '../../core/localGeminiClient.js';
+
 vi.mock('../../core/baseLlmClient.js');
 vi.mock('../../utils/promptIdContext.js');
+vi.mock('../../core/ollamaClient.js');
+vi.mock('../../core/localGeminiClient.js');
 
 describe('ClassifierStrategy', () => {
   let strategy: ClassifierStrategy;
@@ -50,6 +55,7 @@ describe('ClassifierStrategy', () => {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
       getPreviewFeatures: () => false,
+      getUseGemmaRoutingSettings: () => ({ enabled: false }),
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
@@ -277,5 +283,89 @@ describe('ClassifierStrategy', () => {
       ),
     );
     consoleWarnSpy.mockRestore();
+  });
+
+  describe('Local Routing', () => {
+    beforeEach(() => {
+      vi.resetModules();
+    });
+
+    it('should use OllamaClient when local routing is enabled with default provider', async () => {
+      const mockOllamaGenerateJson = vi.fn().mockResolvedValue({
+        reasoning: 'Local Ollama reasoning',
+        model_choice: 'flash',
+      });
+
+      // We need to mock the module before importing/using it in the test context if we want to capture the constructor
+      // However, since we are using vi.mock at the top level, we can just mock the implementation here.
+      const { OllamaClient } = await import('../../core/ollamaClient.js');
+      vi.mocked(OllamaClient).mockImplementation(
+        () =>
+          ({
+            generateJson: mockOllamaGenerateJson,
+          }) as unknown as OllamaClientType,
+      );
+
+      vi.spyOn(mockConfig, 'getUseGemmaRoutingSettings').mockReturnValue({
+        enabled: true,
+        provider: 'ollama',
+      });
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
+
+      expect(OllamaClient).toHaveBeenCalled();
+      expect(mockOllamaGenerateJson).toHaveBeenCalled();
+      expect(decision).toEqual({
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+        metadata: {
+          source: 'Classifier',
+          latencyMs: expect.any(Number),
+          reasoning: 'Local Ollama reasoning',
+        },
+      });
+    });
+
+    it('should use LocalGeminiClient when local routing is enabled with litert-lm provider', async () => {
+      const mockLocalGeminiGenerateJson = vi.fn().mockResolvedValue({
+        reasoning: 'Local Gemini reasoning',
+        model_choice: 'pro',
+      });
+
+      const { LocalGeminiClient } = await import(
+        '../../core/localGeminiClient.js'
+      );
+      vi.mocked(LocalGeminiClient).mockImplementation(
+        () =>
+          ({
+            generateJson: mockLocalGeminiGenerateJson,
+          }) as unknown as LocalGeminiClientType,
+      );
+
+      vi.spyOn(mockConfig, 'getUseGemmaRoutingSettings').mockReturnValue({
+        enabled: true,
+        provider: 'litert-lm',
+      });
+
+      const decision = await strategy.route(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
+
+      expect(LocalGeminiClient).toHaveBeenCalled();
+      expect(mockLocalGeminiGenerateJson).toHaveBeenCalled();
+      expect(decision).toEqual({
+        model: DEFAULT_GEMINI_MODEL,
+        metadata: {
+          source: 'Classifier',
+          latencyMs: expect.any(Number),
+          reasoning: 'Local Gemini reasoning',
+        },
+      });
+    });
   });
 });
