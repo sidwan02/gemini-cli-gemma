@@ -248,9 +248,6 @@ Using the codebase investigator: tell me how the ollama inference works.
    environment either due to prompt forgetting)
 1. Gemma often forgets which files it's already looked at.
 
-1. executor.ts when saving chat history also save the system prompt. Call save
-   chat history to file multiple times in the while loop so it updates with the
-   terminal.
 1. Look at chat_history.txt. despite having a summary it still sees status 0 and
    decidesit doesn't have the full information.
 

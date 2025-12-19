@@ -110,6 +110,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly summarizationService: SummarizationService;
   private hasFailedCompressionAttempt = false;
+  private systemInstruction?: string;
 
   /**
    * Creates and validates a new `AgentExecutor` instance.
@@ -174,6 +175,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<void> {
     const history = await chat.getHistory();
     let fileContent = 'Chat History\n\n';
+    if (this.systemInstruction) {
+      fileContent += `--- ROLE: system ---\n${this.systemInstruction}\n---\n\n`;
+    }
     for (const message of history) {
       let content = '';
       for (const part of message?.parts ?? []) {
@@ -1085,26 +1089,26 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     );
 
     // Build system instruction from the templated prompt string.
-    const systemInstruction = promptConfig.systemPrompt
+    this.systemInstruction = promptConfig.systemPrompt
       ? await this.buildSystemPrompt(inputs)
       : undefined;
 
     await fs.writeFile(
       `${this.definition.name}_prompt.txt`,
-      systemInstruction ?? '',
+      this.systemInstruction ?? '',
     );
     debugLogger.log(
       `[DEBUG] System Instruction saved to ${this.definition.name}_prompt.txt`,
     );
 
     // debugLogger.log(
-    //   `[AgentExecutor] Created system instruction: ${systemInstruction}`,
+    //   `[AgentExecutor] Created system instruction: ${this.systemInstruction}`,
     // );
 
     if ('host' in modelConfig) {
       const populatedPromptConfig: PromptConfig = {
         ...promptConfig,
-        systemPrompt: systemInstruction ?? '',
+        systemPrompt: this.systemInstruction ?? '',
         directive: this.definition.promptConfig.directive,
         query: this.definition.promptConfig.query
           ? templateString(this.definition.promptConfig.query, inputs)
@@ -1112,7 +1116,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       };
       return new OllamaChat(
         modelConfig as OllamaModelConfig,
-        systemInstruction,
+        this.systemInstruction,
         startHistory,
         populatedPromptConfig,
       );
@@ -1127,8 +1131,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           },
         };
 
-        if (systemInstruction) {
-          generationConfig.systemInstruction = systemInstruction;
+        if (this.systemInstruction) {
+          generationConfig.systemInstruction = this.systemInstruction;
         }
 
         return new GeminiChat(
