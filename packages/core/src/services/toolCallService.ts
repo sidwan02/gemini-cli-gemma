@@ -13,6 +13,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { stripJsonMarkdown } from '../utils/json.js';
 import type { ModelConfig, OllamaModelConfig } from '../agents/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import * as fs from 'node:fs/promises';
 
 const ToolCallResponseSchema = z.object({
   name: z.string(),
@@ -158,9 +159,38 @@ Respond with only the JSON for the tool call. Do not include any other text or m
       throw new Error('Failed to generate tool call.');
     }
 
+    try {
+      await this._writeChatHistoryToFile(
+        systemPrompt,
+        lastMessageText,
+        textResponse,
+      );
+      await fs.writeFile('tool_call_chat_history.txt', textResponse);
+      debugLogger.log(
+        '[DEBUG] Summarized tool output saved to tool_call_chat_history.txt',
+      );
+    } catch (error) {
+      debugLogger.error(
+        '[DEBUG] Failed to save summarized tool output to tool_call_chat_history.txt:',
+        error,
+      );
+    }
+
     return {
       name: parsed.data.name,
       args: parsed.data.parameters,
     };
+  }
+
+  private async _writeChatHistoryToFile(
+    systemPrompt: string,
+    userMessage: string,
+    modelResponse: string,
+  ): Promise<void> {
+    let fileContent = 'Tool Call Service Chat History\n\n';
+    fileContent += `--- ROLE: system ---\n${systemPrompt}\n---\n\n`;
+    fileContent += `--- ROLE: user ---\n${userMessage}\n---\n\n`;
+    fileContent += `--- ROLE: model ---\n${modelResponse}\n---\n\n`;
+    await fs.writeFile(`tool_call_service_chat_history.txt`, fileContent);
   }
 }

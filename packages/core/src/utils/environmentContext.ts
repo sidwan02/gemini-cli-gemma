@@ -21,7 +21,8 @@ export async function getDirectoryContextString(
   const workspaceDirectories = workspaceContext.getDirectories();
 
   let folderStructure = '';
-  if (model === 'gemma3:12b') {
+  // if (model === 'gemma3:12b') {
+  if (model === 'gemma3:27b') {
     const folderStructures = await Promise.all(
       workspaceDirectories.map((dir) =>
         getFolderStructure(dir, {

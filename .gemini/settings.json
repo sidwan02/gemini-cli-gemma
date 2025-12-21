@@ -14,7 +14,8 @@
       // "model": "gemma3n:e4b"
       "model": "gemma3:12b",
       // "model": "gemma3:12b"
-      "subagentSummarizeToolOutput": { "enabled": false }
+      "subagentSummarizeToolOutput": { "enabled": true },
+      "useToolCallService": true
     },
     "useModelRouter": {
       "useGemmaRouting": {

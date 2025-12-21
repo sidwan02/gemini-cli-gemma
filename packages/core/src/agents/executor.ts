@@ -1175,6 +1175,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     submittedOutput: string | null;
     taskCompleted: boolean;
   }> {
+    debugLogger.log(
+      `[AgentExecutor] Processing ${functionCalls.length} function calls.`,
+    );
     const useToolCallService = this._usesToolCallService();
 
     if (useToolCallService) {
@@ -1196,9 +1199,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       functionCalls = completeFunctionCalls;
     }
 
-    debugLogger.log(
-      `[AgentExecutor] Processing ${functionCalls.length} function calls.`,
-    );
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
     debugLogger.log(
       `[AgentExecutor] Allowed tools for this agent: ${Array.from(
@@ -1680,9 +1680,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const useToolCallService = this._usesToolCallService();
 
       if (useToolCallService) {
-        const toolNames = tools.map((tool) => tool.name).join(', ');
+        debugLogger.log(
+          '[AgentExecutor] Injecting tool names into system prompt.',
+        );
+        const toolNames = tools
+          .map((tool) => JSON.stringify({ name: tool.name }))
+          .join('\n');
         templateInputs['tool_code'] = toolNames;
       } else {
+        debugLogger.log(
+          '[AgentExecutor] Injecting tool signatures into system prompt.',
+        );
         const toolCode = this._prepareGemmaToolCode(tools);
         templateInputs['tool_code'] = toolCode;
         if (promptConfig.directive) {
@@ -1691,10 +1699,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    debugLogger.log(
-      '[AgentExecutor] Preparing system prompt with template inputs: ',
-      templateInputs,
-    );
+    // debugLogger.log(
+    //   '[AgentExecutor] Preparing system prompt with template inputs: ',
+    //   templateInputs,
+    // );
 
     // TODO: verify this reminder works with tool call injection.
     if (
