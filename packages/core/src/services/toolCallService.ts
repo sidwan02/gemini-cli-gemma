@@ -5,20 +5,14 @@
  */
 
 import type { FunctionCall, FunctionDeclaration, Schema } from '@google/genai';
-import { z } from 'zod';
 
 import type { GeminiChat } from '../core/geminiChat.js';
 import { OllamaChat, StreamEventType } from '../core/ollamaChat.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { stripJsonMarkdown } from '../utils/json.js';
 import type { ModelConfig, OllamaModelConfig } from '../agents/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import * as fs from 'node:fs/promises';
-
-const ToolCallResponseSchema = z.object({
-  name: z.string(),
-  parameters: z.record(z.unknown()),
-});
+import { parseToolCalls } from '../utils/toolCallParser.js';
 
 /**
  * A service that takes a tool name and chat history and generates a complete
@@ -151,23 +145,22 @@ Respond with only the JSON for the tool call. Do not include any other text or m
     }
 
     const responseText = textResponse;
-    const jsonText = stripJsonMarkdown(responseText);
-    const parsed = ToolCallResponseSchema.safeParse(JSON.parse(jsonText));
+    const functionCalls = parseToolCalls(responseText, 'tool-call-service');
 
-    if (!parsed.success) {
-      debugLogger.log('Failed to parse tool call response', parsed.error);
+    if (functionCalls.length === 0) {
+      debugLogger.log(
+        '[ToolCallService] Failed to parse tool call from model response.',
+      );
       throw new Error('Failed to generate tool call.');
     }
+
+    const parsedFunctionCall = functionCalls[0];
 
     try {
       await this._writeChatHistoryToFile(
         systemPrompt,
         lastMessageText,
         textResponse,
-      );
-      await fs.writeFile('tool_call_chat_history.txt', textResponse);
-      debugLogger.log(
-        '[DEBUG] Summarized tool output saved to tool_call_chat_history.txt',
       );
     } catch (error) {
       debugLogger.error(
@@ -177,8 +170,8 @@ Respond with only the JSON for the tool call. Do not include any other text or m
     }
 
     return {
-      name: parsed.data.name,
-      args: parsed.data.parameters,
+      name: parsedFunctionCall.name,
+      args: parsedFunctionCall.args,
     };
   }
 
@@ -191,6 +184,6 @@ Respond with only the JSON for the tool call. Do not include any other text or m
     fileContent += `--- ROLE: system ---\n${systemPrompt}\n---\n\n`;
     fileContent += `--- ROLE: user ---\n${userMessage}\n---\n\n`;
     fileContent += `--- ROLE: model ---\n${modelResponse}\n---\n\n`;
-    await fs.writeFile(`tool_call_service_chat_history.txt`, fileContent);
+    await fs.writeFile(`tool_call_chat_history.txt`, fileContent);
   }
 }
