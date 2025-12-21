@@ -14,16 +14,18 @@
       // "model": "gemma3n:e4b"
       "model": "gemma3:12b",
       // "model": "gemma3:12b"
-      "subagentSummarizeToolOutput": { "enabled": true }
+      "subagentSummarizeToolOutput": { "enabled": false }
     },
     "useModelRouter": {
       "useGemmaRouting": {
         "enabled": true,
-        "host": "http://localhost:8000",
+        // "host": "http://localhost:8000",
+        "host": "http://localhost:11434",
         // "model": "gemma3n:e4b"
         // "model": "gemma3n:e2b"
         "model": "gemma3:1b",
-        "provider": "litert-lm"
+        // "provider": "litert-lm"
+        "provider": "ollama"
         // "model": "gemma3:270m"
       }
     }

@@ -547,8 +547,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       signalManager.startAgentSession();
       chat = await this.createChatObject(inputs);
       tools = this.prepareToolsList();
-      const query = this.definition.promptConfig.query
-        ? templateString(this.definition.promptConfig.query, inputs)
+      const promptConfig = this._getPromptConfig();
+      const query = promptConfig.query
+        ? templateString(promptConfig.query, inputs)
         : inputs['objective'] !== undefined
           ? (inputs['objective'] as string)
           : 'Get Started!';
@@ -1079,7 +1080,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private async createChatObject(
     inputs: AgentInputs,
   ): Promise<GeminiChat | OllamaChat> {
-    const { promptConfig, modelConfig } = this.definition;
+    const { modelConfig } = this.definition;
+    const promptConfig = this._getPromptConfig();
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
       throw new Error(
@@ -1113,9 +1115,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const populatedPromptConfig: PromptConfig = {
         ...promptConfig,
         systemPrompt: this.systemInstruction ?? '',
-        directive: this.definition.promptConfig.directive,
-        query: this.definition.promptConfig.query
-          ? templateString(this.definition.promptConfig.query, inputs)
+        directive: promptConfig.directive,
+        query: promptConfig.query
+          ? templateString(promptConfig.query, inputs)
           : 'Get Started!',
       };
       return new OllamaChat(
@@ -1173,19 +1175,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     submittedOutput: string | null;
     taskCompleted: boolean;
   }> {
-    const agentName = this.definition.name;
-    let useToolCallService = false;
-    if (agentName === 'codebase_investigator') {
-      useToolCallService =
-        !!this.runtimeContext.getCodebaseInvestigatorSettings()
-          .useToolCallService;
-    } else if (agentName === 'gemma_agent') {
-      useToolCallService =
-        !!this.runtimeContext.getGemmaSubagentSettings().useToolCallService;
-    } else if (agentName === 'build_and_test_agent') {
-      useToolCallService =
-        !!this.runtimeContext.getBuildAndTestSettings().useToolCallService;
-    }
+    const useToolCallService = this._usesToolCallService();
 
     if (useToolCallService) {
       const completeFunctionCalls: FunctionCall[] = [];
@@ -1647,9 +1637,34 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     )}`;
   }
 
+  private _usesToolCallService(): boolean {
+    const agentName = this.definition.name;
+    if (agentName === 'codebase_investigator') {
+      return !!this.runtimeContext.getCodebaseInvestigatorSettings()
+        .useToolCallService;
+    } else if (agentName === 'gemma_agent') {
+      return !!this.runtimeContext.getGemmaSubagentSettings()
+        .useToolCallService;
+    } else if (agentName === 'build_and_test_agent') {
+      return !!this.runtimeContext.getBuildAndTestSettings().useToolCallService;
+    }
+    return false;
+  }
+
+  private _getPromptConfig(): PromptConfig {
+    const useToolCallService = this._usesToolCallService();
+
+    const promptConfig =
+      useToolCallService && this.definition.promptConfigDynamicTools
+        ? this.definition.promptConfigDynamicTools
+        : this.definition.promptConfig;
+
+    return promptConfig;
+  }
+
   /** Builds the system prompt from the agent definition and inputs. */
   private async buildSystemPrompt(inputs: AgentInputs): Promise<string> {
-    const { promptConfig } = this.definition;
+    const promptConfig = this._getPromptConfig();
     if (!promptConfig.systemPrompt) {
       return '';
     }
@@ -1660,45 +1675,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       templateInputs['directive'] = promptConfig.directive;
     }
 
-    if (
-      promptConfig.systemPrompt.includes('${tool_code}') ||
-      promptConfig.systemPrompt.includes('${tools_list}')
-    ) {
+    if (promptConfig.systemPrompt.includes('${tool_code}')) {
       const tools = this.prepareToolsList();
-      let useToolCallService = false;
-      const agentName = this.definition.name;
-      if (agentName === 'codebase_investigator') {
-        useToolCallService =
-          !!this.runtimeContext.getCodebaseInvestigatorSettings()
-            .useToolCallService;
-      } else if (agentName === 'gemma_agent') {
-        useToolCallService =
-          !!this.runtimeContext.getGemmaSubagentSettings().useToolCallService;
-      } else if (agentName === 'build_and_test_agent') {
-        useToolCallService =
-          !!this.runtimeContext.getBuildAndTestSettings().useToolCallService;
-      }
+      const useToolCallService = this._usesToolCallService();
 
       if (useToolCallService) {
         const toolNames = tools.map((tool) => tool.name).join(', ');
-        templateInputs['tools_list'] = toolNames;
-        if (promptConfig.directive) {
-          const newDirective = promptConfig.directive
-            .replace(
-              /Your response must \*ONLY\* contain a one-line explanation of your rationale, followed by the tool call in JSON format\./,
-              'Your response must *ONLY* contain a one-line explanation of your rationale, followed by the tool choice in JSON format.',
-            )
-            .replace(
-              /\{[\s\S]*?\}/,
-              `{
-  "name": "tool_name"
-}`,
-            );
-          templateInputs['directive'] = newDirective;
-        }
+        templateInputs['tool_code'] = toolNames;
       } else {
         const toolCode = this._prepareGemmaToolCode(tools);
-        templateInputs['tools_list'] = toolCode;
+        templateInputs['tool_code'] = toolCode;
         if (promptConfig.directive) {
           templateInputs['directive'] = promptConfig.directive;
         }

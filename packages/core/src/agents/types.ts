@@ -63,6 +63,7 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
   displayName?: string;
   description: string;
   promptConfig: PromptConfig;
+  promptConfigDynamicTools?: PromptConfig;
   modelConfig: ModelConfig | OllamaModelConfig;
   runConfig: RunConfig;
   toolConfig?: ToolConfig;
