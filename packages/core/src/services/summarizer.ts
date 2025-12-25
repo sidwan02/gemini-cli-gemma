@@ -54,31 +54,23 @@ export class SummarizationService {
         }
       }
 
-      try {
-        await fs.writeFile(
-          'summarize_tool_prompt.txt',
-          JSON.stringify(userParts, null, 2),
-        );
-        debugLogger.log(
-          '[DEBUG] Summarized tool output saved to summarize_tool_prompt.txt',
-        );
-      } catch (error) {
-        debugLogger.error(
-          '[DEBUG] Failed to save summarized tool output to summarize_tool_prompt.txt:',
-          error,
-        );
-      }
-
       const chat = new OllamaChat(
         modelConfig as OllamaModelConfig,
         SUMMARIZER_SYSTEM_PROMPT,
       );
+
+      let fileContents = 'Summarizer Service Chat History\n\n';
+      fileContents += `--- ROLE: system ---\n${SUMMARIZER_SYSTEM_PROMPT}\n---\n\n`;
+      await this._writeChatHistoryToFile(fileContents);
 
       const toolCallJson = JSON.stringify(userParts);
       const userPrompt = SUMMARIZER_USER_PROMPT.replace(
         '{{objective}}',
         objective,
       ).replace('{{toolcall}}', toolCallJson);
+
+      fileContents += `--- ROLE: user ---\n${userPrompt}\n---\n\n`;
+      await this._writeChatHistoryToFile(fileContents);
 
       const messageParams = {
         message: [{ text: userPrompt }],
@@ -90,6 +82,8 @@ export class SummarizationService {
       );
 
       let textResponse = '';
+      fileContents += `--- ROLE: model ---\n`;
+      await this._writeChatHistoryToFile(fileContents);
 
       for await (const resp of responseStream) {
         if (resp.type === StreamEventType.CHUNK) {
@@ -103,24 +97,25 @@ export class SummarizationService {
           }
         }
       }
-
-      try {
-        await fs.writeFile('summarized_tool_output.txt', textResponse);
-        debugLogger.log(
-          '[DEBUG] Summarized tool output saved to summarized_tool_output.txt',
-        );
-      } catch (error) {
-        debugLogger.error(
-          '[DEBUG] Failed to save summarized tool output to summarized_tool_output.txt:',
-          error,
-        );
-      }
+      fileContents += `${textResponse}\n---\n\n`;
+      await this._writeChatHistoryToFile(fileContents);
 
       // Just return the raw text response from the summarizer model.
       return textResponse;
     } else {
       // Summarization for non-Ollama models can be implemented here.
       throw new Error('Summarization using Gemini Model is not implemented.');
+    }
+  }
+
+  private async _writeChatHistoryToFile(content: string): Promise<void> {
+    try {
+      await fs.writeFile(`summarizer_chat_history.txt`, content);
+    } catch (error) {
+      debugLogger.error(
+        '[DEBUG] Failed to write to summarizer_chat_history.txt:',
+        error,
+      );
     }
   }
 }
