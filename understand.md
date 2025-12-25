@@ -248,11 +248,20 @@ Using the codebase investigator: tell me how the ollama inference works.
    environment either due to prompt forgetting)
 1. Gemma often forgets which files it's already looked at.
 
-1. Look at chat_history.txt. despite having a summary it still sees status 0 and
-   decidesit doesn't have the full information.
+<!--  -->
 
-1. the dircetive swapping between tool choice and tool call is a little messy.
-   just verify that later in executor.ts
+1. chat_history maybe shouldn't have the model's tool choice. actually this
+   could be fine.
+1. Tool call service should take in the full chat history since if the model's
+   tool choice is provided then the last mesage is just the tool choice action
+   by the main subagent loop.
+1. When tool service makes a tool call, that should be reflected in the UI. In
+   general, subagent services should be reflected in the UI.
+
+<!-- For routing -->
+
+If ollama hasn't started then this error comes out from routing:
+http://gpaste/5701046179594240
 
 # Litellm setup
 

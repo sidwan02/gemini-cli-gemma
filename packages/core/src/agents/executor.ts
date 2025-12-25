@@ -65,7 +65,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Part as OllamaPart } from '../core/ollamaChat.js';
 // import { extractValidJson } from '../utils/json.js';
-import { stripJsonMarkdown } from '../utils/json.js';
+
 import * as fs from 'node:fs/promises';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {

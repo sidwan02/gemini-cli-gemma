@@ -108,18 +108,27 @@ export class ToolCallService {
       .join(' ');
 
     const systemPrompt = `You are a tool call generator. Your task is to generate a valid tool call for the tool named "${toolName}".
-You will be provided with the schema of the tool and the last user message.
+You will be provided with the schema of the tool and the chat history.
 Generate a tool call that best helps with the user's request.
 The tool schema is:
 ${formattedSchema}
 
 Respond with only the JSON for the tool call. Do not include any other text or markdown.
+
+The 
 `;
+
+    const reminder = `Remember! 
+You must look at the preceding chat history to understand the user's objective and current step in the process.
+Only respond with the JSON for the tool call. Do not include any other text or markdown.`;
+
+    // TODO: add a user message which actually has the formatted schema and a reiteration of the user's objective and asks what command must be called. that will replace text: ''. maybe it's fine to have the schema and tool name in the system prompt.
 
     const tempChat = new OllamaChat(
       modelConfig as OllamaModelConfig,
       systemPrompt,
-      [],
+      // [],
+      chatHistory,
       {
         query: '',
         systemPrompt,
@@ -127,7 +136,8 @@ Respond with only the JSON for the tool call. Do not include any other text or m
     );
 
     const responseStream = await tempChat.sendMessageStream(modelConfig.model, {
-      message: [{ text: lastMessageText }],
+      // message: [{ text: lastMessageText }],
+      message: [{ text: reminder }],
     });
 
     let textResponse = '';
