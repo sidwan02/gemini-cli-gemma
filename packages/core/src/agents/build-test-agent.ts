@@ -178,13 +178,16 @@ You have access to these tools:
 \${directive}
 `,
     directive: `## Output Format
+If you decide to choose a tool to further the task, your response must *ONLY* contain the tool choice in JSON format.
 
-If you decide to choose a tool to further the task, your response must *ONLY* contain a one-line explanation of your rationale, followed by the tool choice in JSON format.
+The \`goal\` you provide is critical, as it will be passed to a separate, specialized agent that executes the command. This agent has **no access to our conversation history**. Therefore, your \`goal\` **must be a fully self-contained and actionable instruction**. It needs to include not just *what* to do, but also *why*, so the other agent understands the context.
 
-**Example:**
-I have chosen \`tool_name\` because [Your concise rationale and what you are trying to do and why it will help].
+**JSON Structure:**
 \`\`\`json
-{ "name": "tool_name" }
+{
+  "name": "run_shell_command",
+  "goal": "<Your fully self-contained goal>"
+}
 \`\`\`
 
 If you decide the user's objective is met, your response must *ONLY* contain a five bullet point summary (e.g., test names, file names, pass/fail status), followed by the \`complete_task\` tool call in JSON format.
@@ -202,20 +205,24 @@ I am satisfied with the results. Here are the execution highlights:
 
 `,
     reminder: `Remember! You are a **Build And Test Agent** whose purpose is to build and/or test code according to the user's objective.
-
+        
 ## Available Tools
 You have access to these tools:
 \${tool_code}
 
 
 ## Output Format
+If you decide to choose a tool to further the task, your response must *ONLY* contain the tool choice in JSON format.
 
-If you decide to choose a tool to further the task, your response must *ONLY* contain a one-line explanation of your rationale, followed by the tool choice in JSON format.
+The \`goal\` you provide is critical, as it will be passed to a separate, specialized agent that executes the command. This agent has **no access to our conversation history**. Therefore, your \`goal\` **must be a fully self-contained and actionable instruction**. It needs to include not just *what* to do, but also *why*, so the other agent understands the context.
 
-**Example:**
-I have chosen \`tool_name\` because [Your concise rationale and what you are trying to do and why it will help].
+
+**JSON Structure:**
 \`\`\`json
-{ "name": "tool_name" }
+{
+  "name": "run_shell_command",
+  "goal": "<Your fully self-contained goal>"
+}
 \`\`\`
 
 If you decide the user's objective is met, your response must *ONLY* contain a five bullet point summary (e.g., test names, file names, pass/fail status), followed by the \`complete_task\` tool call in JSON format.

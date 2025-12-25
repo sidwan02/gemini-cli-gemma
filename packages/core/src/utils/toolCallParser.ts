@@ -34,16 +34,29 @@ export function parseToolCalls(text: string, promptId: string): FunctionCall[] {
         toolCall !== null &&
         'name' in toolCall
       ) {
-        const tc = toolCall as {
-          name: string;
-          parameters?: Record<string, unknown>;
-        };
-        if (typeof tc.name === 'string') {
-          return {
-            // id: `${promptId}-ollama-${index}`,
-            name: tc.name,
-            args: tc.parameters ?? {},
+        // Handle dynamic tool calls with 'goal'
+        if ('goal' in toolCall) {
+          debugLogger.log(`[Debug] Processing dynamic tool call with goal.`);
+          const tc = toolCall as { name: string; goal: string };
+          if (typeof tc.name === 'string' && typeof tc.goal === 'string') {
+            return {
+              name: tc.name,
+              args: { goal: tc.goal },
+            };
+          }
+        } else {
+          // Handle static tool calls with 'parameters'
+          const tc = toolCall as {
+            name: string;
+            parameters?: Record<string, unknown>;
           };
+          if (typeof tc.name === 'string') {
+            return {
+              // id: `${promptId}-ollama-${index}`,
+              name: tc.name,
+              args: tc.parameters ?? {},
+            };
+          }
         }
       }
       return null;
@@ -70,6 +83,7 @@ export function parseToolCalls(text: string, promptId: string): FunctionCall[] {
     // Not a valid JSON, proceed with regex parsing
     debugLogger.log(
       '[Debug] Failed to parse tool calls as JSON, falling back to regex.',
+      e,
     );
   }
 
@@ -123,8 +137,5 @@ export function parseToolCalls(text: string, promptId: string): FunctionCall[] {
       args,
     });
   }
-  // debugLogger.log(
-  //   `[Debug] Parsed Ollama tool calls: ${JSON.stringify(functionCalls)}`,
-  // );
   return functionCalls;
 }

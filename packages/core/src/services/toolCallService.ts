@@ -6,7 +6,6 @@
 
 import type { FunctionCall, FunctionDeclaration, Schema } from '@google/genai';
 
-import type { GeminiChat } from '../core/geminiChat.js';
 import { OllamaChat, StreamEventType } from '../core/ollamaChat.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfig, OllamaModelConfig } from '../agents/types.js';
@@ -83,7 +82,7 @@ export class ToolCallService {
    */
   async generateToolCall(
     toolName: string,
-    chat: GeminiChat | OllamaChat,
+    goal: string,
     modelConfig: ModelConfig | OllamaModelConfig,
   ): Promise<FunctionCall> {
     const tool = this.toolRegistry.getTool(toolName);
@@ -96,51 +95,46 @@ export class ToolCallService {
 
     const formattedSchema = this._prepareGemmaToolCode(functionDeclarations);
 
-    const chatHistory = await chat.getHistory();
-    const lastMessage = chatHistory[chatHistory.length - 1];
-
-    if (!lastMessage || !('parts' in lastMessage)) {
-      throw new Error('Could not get last message from chat history');
-    }
-
-    const lastMessageText = lastMessage
-      .parts!.map((part) => ('text' in part ? part.text : ''))
-      .join(' ');
+    let fileContents = 'Tool Call Service Chat History\n\n';
 
     const systemPrompt = `You are a tool call generator. Your task is to generate a valid tool call for the tool named "${toolName}".
-You will be provided with the schema of the tool and the chat history.
-Generate a tool call that best helps with the user's request.
+You will be provided with the schema of the tool and a goal.
+Generate a tool call that best helps with achieving the goal.
+
+You must return a single JSON object with the following structure:
+{
+  "name": "${toolName}",
+  "parameters": { ... }
+}
 The tool schema is:
 ${formattedSchema}
 
 Respond with only the JSON for the tool call. Do not include any other text or markdown.
-
-The 
 `;
-
-    const reminder = `Remember! 
-You must look at the preceding chat history to understand the user's objective and current step in the process.
-Only respond with the JSON for the tool call. Do not include any other text or markdown.`;
-
-    // TODO: add a user message which actually has the formatted schema and a reiteration of the user's objective and asks what command must be called. that will replace text: ''. maybe it's fine to have the schema and tool name in the system prompt.
+    fileContents += `--- ROLE: system ---\n${systemPrompt}\n---\n\n`;
+    await this._writeChatHistoryToFile(fileContents);
 
     const tempChat = new OllamaChat(
       modelConfig as OllamaModelConfig,
       systemPrompt,
-      // [],
-      chatHistory,
+      [],
       {
         query: '',
         systemPrompt,
       },
     );
 
+    const userMessage = `The goal is: ${goal}`;
+    fileContents += `--- ROLE: user ---\n${userMessage}\n---\n\n`;
+    await this._writeChatHistoryToFile(fileContents);
+
     const responseStream = await tempChat.sendMessageStream(modelConfig.model, {
-      // message: [{ text: lastMessageText }],
-      message: [{ text: reminder }],
+      message: [{ text: userMessage }],
     });
 
     let textResponse = '';
+    fileContents += `--- ROLE: model ---\n`;
+    await this._writeChatHistoryToFile(fileContents);
     for await (const resp of responseStream) {
       if (resp.type === StreamEventType.CHUNK) {
         const chunk = resp.value;
@@ -153,6 +147,8 @@ Only respond with the JSON for the tool call. Do not include any other text or m
         }
       }
     }
+    fileContents += `${textResponse}\n---\n\n`;
+    await this._writeChatHistoryToFile(fileContents);
 
     const responseText = textResponse;
     const functionCalls = parseToolCalls(responseText, 'tool-call-service');
@@ -166,34 +162,21 @@ Only respond with the JSON for the tool call. Do not include any other text or m
 
     const parsedFunctionCall = functionCalls[0];
 
-    try {
-      await this._writeChatHistoryToFile(
-        systemPrompt,
-        lastMessageText,
-        textResponse,
-      );
-    } catch (error) {
-      debugLogger.error(
-        '[DEBUG] Failed to save summarized tool output to tool_call_chat_history.txt:',
-        error,
-      );
-    }
-
     return {
       name: parsedFunctionCall.name,
       args: parsedFunctionCall.args,
     };
   }
 
-  private async _writeChatHistoryToFile(
-    systemPrompt: string,
-    userMessage: string,
-    modelResponse: string,
-  ): Promise<void> {
-    let fileContent = 'Tool Call Service Chat History\n\n';
-    fileContent += `--- ROLE: system ---\n${systemPrompt}\n---\n\n`;
-    fileContent += `--- ROLE: user ---\n${userMessage}\n---\n\n`;
-    fileContent += `--- ROLE: model ---\n${modelResponse}\n---\n\n`;
-    await fs.writeFile(`tool_call_chat_history.txt`, fileContent);
+  private async _writeChatHistoryToFile(content: string): Promise<void> {
+    try {
+      await fs.writeFile(`tool_call_chat_history.txt`, content);
+    } catch (error) {
+      debugLogger.error(
+        '[DEBUG] Failed to write to tool_call_chat_history.txt:',
+
+        error,
+      );
+    }
   }
 }

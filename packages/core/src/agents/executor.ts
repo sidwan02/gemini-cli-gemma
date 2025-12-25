@@ -1058,10 +1058,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         if (functionCall.name) {
           const tool = this.toolRegistry.getTool(functionCall.name);
           if (tool) {
+            const goal = (functionCall.args as { goal?: string })?.goal ?? '';
+            if (!goal) {
+              throw new Error(
+                'The "goal" argument is missing from the tool call.',
+              );
+            }
             const completeFunctionCall =
               await this.toolCallService.generateToolCall(
                 functionCall.name,
-                chat,
+                goal,
                 this.definition.modelConfig,
               );
             completeFunctionCalls.push(completeFunctionCall);
