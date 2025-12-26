@@ -405,7 +405,13 @@ export type SubagentHistoryItem =
     }
   | { type: 'interrupted'; data: { message: string } }
   | { type: 'user_message'; data: { message: string } }
-  | SubagentToolSummaryHistoryItem;
+  | SubagentToolSummaryHistoryItem
+  | SubagentToolSummaryChunkHistoryItem;
+
+export type SubagentToolSummaryChunkHistoryItem = {
+  type: 'tool_summary_chunk';
+  data: { summary: string };
+};
 
 export type SubagentToolSummaryHistoryItem = {
   type: 'tool_summary';

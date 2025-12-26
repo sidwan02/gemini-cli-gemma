@@ -129,6 +129,13 @@ export class SubagentInvocation<
               `GEMINI_SUBAGENT_TOOL_SUMMARY::${JSON.stringify(activity.data)}`,
             );
             break;
+          case 'TOOL_SUMMARY_CHUNK':
+            updateOutput(
+              `GEMINI_SUBAGENT_TOOL_SUMMARY_CHUNK::${JSON.stringify(
+                activity.data,
+              )}`,
+            );
+            break;
           case 'ERROR':
             updateOutput(
               `GEMINI_SUBAGENT_ERROR::${JSON.stringify(activity.data)}`,

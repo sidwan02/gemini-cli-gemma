@@ -1360,6 +1360,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             toolResponse.responseParts,
             this.definition.modelConfig,
             goal,
+            (summaryChunk: string) => {
+              this.emitActivity('TOOL_SUMMARY_CHUNK', {
+                summary: summaryChunk,
+              });
+            },
           );
           if (summary) {
             this.emitActivity('TOOL_SUMMARY', {

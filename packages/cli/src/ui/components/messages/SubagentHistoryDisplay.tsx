@@ -15,7 +15,7 @@ import type {
 } from '../../types.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { SubagentToolCallDisplay } from './SubagentToolCallDisplay.js';
-// import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface SubagentHistoryDisplayProps {
   history: SubagentHistoryItem[];
@@ -101,11 +101,18 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
         }
         break;
       case 'tool_summary':
-        if (lastTurn.toolSummary) {
-          acc.push({ toolSummary: item });
-        } else {
-          lastTurn.toolSummary = item;
-        }
+        // Always overwrite the toolSummary in the current turn. This handles
+        // both the final summary replacing a chunk, and a new summary in a
+        // new context.
+        lastTurn.toolSummary = item;
+        break;
+      case 'tool_summary_chunk':
+        // Overwrite the previous toolSummary with the new chunk, enabling streaming.
+        debugLogger.log('overriding tool summary chunk');
+        lastTurn.toolSummary = {
+          type: 'tool_summary',
+          data: { summary: item.data.summary },
+        };
         break;
       // TODO: Shell tool output is very glitchy.
       // TODO: there's a bug when multiple shell tool calls are made in succession (for tool_output_chunk), they get merged into one response.

@@ -49,6 +49,7 @@ export class SummarizationService {
     tollResponseParts: GeminiPart[],
     modelConfig: OllamaModelConfig | ModelConfig,
     objective: string,
+    onChunk?: (fullSummary: string) => void,
   ): Promise<string | null> {
     debugLogger.log(
       `[SummarizationService] Starting summarization using model: ${modelConfig.model}`,
@@ -104,6 +105,9 @@ export class SummarizationService {
 
           if (text) {
             textResponse = text;
+            if (onChunk) {
+              onChunk(textResponse);
+            }
           }
         }
       }

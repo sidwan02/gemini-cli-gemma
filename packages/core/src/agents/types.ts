@@ -50,7 +50,8 @@ export interface SubagentActivityEvent {
     | 'THOUGHT_CHUNK'
     | 'ERROR'
     | 'TOOL_OUTPUT_CHUNK'
-    | 'TOOL_SUMMARY';
+    | 'TOOL_SUMMARY'
+    | 'TOOL_SUMMARY_CHUNK';
   data: Record<string, unknown>;
 }
 

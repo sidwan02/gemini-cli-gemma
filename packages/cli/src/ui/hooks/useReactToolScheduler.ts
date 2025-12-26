@@ -112,6 +112,7 @@ export function useReactToolScheduler(
           'GEMINI_SUBAGENT_TOOL_CALL::': 'tool_call',
           'GEMINI_SUBAGENT_TOOL_RESPONSE::': 'tool_response',
           'GEMINI_SUBAGENT_TOOL_SUMMARY::': 'tool_summary',
+          'GEMINI_SUBAGENT_TOOL_SUMMARY_CHUNK::': 'tool_summary_chunk',
           'GEMINI_SUBAGENT_TOOL_OUTPUT_CHUNK::': 'tool_output_chunk',
           'GEMINI_SUBAGENT_ERROR::': 'error',
         };
@@ -133,12 +134,6 @@ export function useReactToolScheduler(
                       type,
                       data,
                     };
-
-                    // debugLogger.log(
-                    //   `[useReactToolScheduler] Received subagent history item: ${JSON.stringify(
-                    //     newHistoryItem,
-                    //   )}`,
-                    // );
 
                     const currentHistory = executingTc.subagentHistory || [];
                     const lastHistoryItem =
@@ -165,9 +160,17 @@ export function useReactToolScheduler(
                         ...currentHistory.slice(0, -1),
                         newHistoryItem,
                       ];
-                      // debugLogger.log(
-                      //   `[useReactToolScheduler] Got tool_output_chunk with new history item: ${newHistoryItem.data.text}`,
-                      // );
+                    } else if (
+                      (newHistoryItem.type === 'tool_summary_chunk' ||
+                        newHistoryItem.type === 'tool_summary') &&
+                      (lastHistoryItem?.type === 'tool_summary_chunk' ||
+                        lastHistoryItem?.type === 'tool_summary')
+                    ) {
+                      // Replace the last summary/chunk with the new one
+                      newHistory = [
+                        ...currentHistory.slice(0, -1),
+                        newHistoryItem,
+                      ];
                     } else {
                       // Append the new item
                       newHistory = [...currentHistory, newHistoryItem];
