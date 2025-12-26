@@ -258,6 +258,7 @@ Using the codebase investigator: tell me how the ollama inference works.
    like this
    `Tool Call Output: [{"text":"{\"id\":\"283a387e-a136-4443-b3cd-1267b58cb5db########0-build_and_test_agent-mchfa2#2-0\",\"name\":\"run_shell_command\",\"response\":{\"error\":\"[Operation Cancelled] User cancelled the operation.\"}}"}]`
    and keeps executing, it should be interrupted properly and stop inference.
+1. when complete task is called it never ends for some reason... why?
 
 <!-- For routing -->
 
