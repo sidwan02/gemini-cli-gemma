@@ -1362,6 +1362,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             goal,
           );
           if (summary) {
+            this.emitActivity('TOOL_SUMMARY', {
+              summary,
+            });
             debugLogger.log(
               `[AgentExecutor] Summarized output for tool: ${functionCall.name} (ID: ${callId})`,
             );

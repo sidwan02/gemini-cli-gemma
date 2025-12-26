@@ -404,7 +404,13 @@ export type SubagentHistoryItem =
       data: { error: string; context?: string; name?: string };
     }
   | { type: 'interrupted'; data: { message: string } }
-  | { type: 'user_message'; data: { message: string } };
+  | { type: 'user_message'; data: { message: string } }
+  | SubagentToolSummaryHistoryItem;
+
+export type SubagentToolSummaryHistoryItem = {
+  type: 'tool_summary';
+  data: { summary: string };
+};
 
 export type SubagentThoughtHistoryItem = Extract<
   SubagentHistoryItem,

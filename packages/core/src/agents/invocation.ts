@@ -124,6 +124,11 @@ export class SubagentInvocation<
               )}`,
             );
             break;
+          case 'TOOL_SUMMARY':
+            updateOutput(
+              `GEMINI_SUBAGENT_TOOL_SUMMARY::${JSON.stringify(activity.data)}`,
+            );
+            break;
           case 'ERROR':
             updateOutput(
               `GEMINI_SUBAGENT_ERROR::${JSON.stringify(activity.data)}`,

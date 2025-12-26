@@ -225,6 +225,7 @@ Using the codebase investigator: tell me how the ollama inference works.
 
 - `use the build and test tool: run npm test -- src/tools/glob.test.ts`
 - `use the build and test tool: test src/tools/glob.test.ts`
+- `use the build and test tool: run npm test -- src/tools/glob.test.ts in the core workspace`
 
 # TODO:
 

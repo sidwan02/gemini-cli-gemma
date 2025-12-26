@@ -111,6 +111,7 @@ export function useReactToolScheduler(
           'GEMINI_SUBAGENT_THOUGHT::': 'thought',
           'GEMINI_SUBAGENT_TOOL_CALL::': 'tool_call',
           'GEMINI_SUBAGENT_TOOL_RESPONSE::': 'tool_response',
+          'GEMINI_SUBAGENT_TOOL_SUMMARY::': 'tool_summary',
           'GEMINI_SUBAGENT_TOOL_OUTPUT_CHUNK::': 'tool_output_chunk',
           'GEMINI_SUBAGENT_ERROR::': 'error',
         };

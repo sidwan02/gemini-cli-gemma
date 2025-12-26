@@ -11,6 +11,7 @@ import type {
   SubagentToolCallHistoryItem,
   SubagentToolResponseHistoryItem,
   SubagentThoughtHistoryItem,
+  SubagentToolSummaryHistoryItem,
 } from '../../types.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { SubagentToolCallDisplay } from './SubagentToolCallDisplay.js';
@@ -25,6 +26,7 @@ type SubagentTurn = {
   thought?: SubagentThoughtHistoryItem;
   toolCall?: SubagentToolCallHistoryItem;
   toolResponse?: SubagentToolResponseHistoryItem;
+  toolSummary?: SubagentToolSummaryHistoryItem;
   subagentHistory?: SubagentHistoryItem[];
 };
 
@@ -77,9 +79,17 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
 
     switch (item.type) {
       case 'thought':
-        if (lastTurn.thought) {
+        // If the current turn already contains any tool-related activity,
+        // this new thought must start a new turn.
+        if (
+          lastTurn.toolCall ||
+          lastTurn.toolResponse ||
+          lastTurn.toolSummary
+        ) {
           acc.push({ thought: item });
         } else {
+          // Otherwise, it's either the first thought of a turn or a
+          // streaming update to the existing thought.
           lastTurn.thought = item;
         }
         break;
@@ -88,6 +98,13 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
           acc.push({ toolCall: item });
         } else {
           lastTurn.toolCall = item;
+        }
+        break;
+      case 'tool_summary':
+        if (lastTurn.toolSummary) {
+          acc.push({ toolSummary: item });
+        } else {
+          lastTurn.toolSummary = item;
         }
         break;
       // TODO: Shell tool output is very glitchy.
@@ -177,6 +194,24 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
                     toolCall={turn.toolCall}
                     toolResponse={turn.toolResponse}
                     terminalWidth={availableWidth} // Also apply the adjusted width to SubagentToolCallDisplay
+                  />
+                </Box>
+              )}
+              {turn.toolSummary && (
+                <Box
+                  flexDirection="column"
+                  marginBottom={1}
+                  width={availableWidth}
+                  borderStyle="single"
+                  borderColor="cyan"
+                  paddingX={1}
+                  paddingY={0}
+                >
+                  <Text color="cyan">Summarized Tool Output:</Text>
+                  <MarkdownDisplay
+                    text={turn.toolSummary.data.summary}
+                    isPending={false}
+                    terminalWidth={availableWidth - 2} // Adjust width for padding
                   />
                 </Box>
               )}

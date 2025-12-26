@@ -49,7 +49,8 @@ export interface SubagentActivityEvent {
     | 'TOOL_CALL_END'
     | 'THOUGHT_CHUNK'
     | 'ERROR'
-    | 'TOOL_OUTPUT_CHUNK';
+    | 'TOOL_OUTPUT_CHUNK'
+    | 'TOOL_SUMMARY';
   data: Record<string, unknown>;
 }
 
