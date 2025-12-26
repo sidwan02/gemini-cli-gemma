@@ -1052,13 +1052,15 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     );
     const useToolCallService = this._usesToolCallService();
 
+    let goal = '';
+
     if (useToolCallService) {
       const completeFunctionCalls: FunctionCall[] = [];
       for (const functionCall of functionCalls) {
         if (functionCall.name) {
           const tool = this.toolRegistry.getTool(functionCall.name);
           if (tool) {
-            const goal = (functionCall.args as { goal?: string })?.goal ?? '';
+            goal = (functionCall.args as { goal?: string })?.goal ?? '';
             if (!goal) {
               throw new Error(
                 'The "goal" argument is missing from the tool call.',
@@ -1070,6 +1072,13 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
                 goal,
                 this.definition.modelConfig,
               );
+            // Preserve the original goal in the new function call's arguments for summarization.
+            if (goal) {
+              completeFunctionCall.args = {
+                ...completeFunctionCall.args,
+                goal,
+              };
+            }
             completeFunctionCalls.push(completeFunctionCall);
           }
         }
@@ -1337,10 +1346,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         // IMPORTANT: Only summarize if the agent-specific config is present and enabled.
         // Do not fall back to a global setting.
         if ((agentSummarizeConfig as { enabled?: boolean })?.enabled) {
+          debugLogger.log(`[AgentExecutor] Args is: ${JSON.stringify(args)}`);
+
           const summary = await this.summarizationService.summarize(
             toolResponse.responseParts,
             this.definition.modelConfig,
-            objective,
+            goal,
           );
           if (summary) {
             debugLogger.log(
