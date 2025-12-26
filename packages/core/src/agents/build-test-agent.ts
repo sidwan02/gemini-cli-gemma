@@ -180,7 +180,7 @@ You have access to these tools:
     directive: `## Output Format
 If you decide to choose a tool to further the task, your response must *ONLY* contain the tool choice in JSON format.
 
-The \`goal\` you provide is critical, as it will be passed to a separate, specialized agent that executes the command. This agent has **no access to our conversation history**. Therefore, your \`goal\` **must be a fully self-contained and actionable instruction**. It needs to include not just *what* to do, but also *why*, so the other agent understands the context.
+The \`goal\` you provide is critical, as it will be passed to a separate, specialized agent that executes the command. This agent has **no access to our conversation history**. Therefore, your \`goal\` **must be a fully self-contained and actionable instruction**; it must not refer to previous steps (e.g., it should not say 'specified file' or 'mentioned argument' instead those should all be directly stated). It needs to include not just *what* to do, but also *why*, so the other agent understands the context.
 
 **JSON Structure:**
 \`\`\`json
@@ -214,7 +214,7 @@ You have access to these tools:
 ## Output Format
 If you decide to choose a tool to further the task, your response must *ONLY* contain the tool choice in JSON format.
 
-The \`goal\` you provide is critical, as it will be passed to a separate, specialized agent that executes the command. This agent has **no access to our conversation history**. Therefore, your \`goal\` **must be a fully self-contained and actionable instruction**. It needs to include not just *what* to do, but also *why*, so the other agent understands the context.
+The \`goal\` you provide is critical, as it will be passed to a separate, specialized agent that executes the command. This agent has **no access to our conversation history**. Therefore, your \`goal\` **must be a fully self-contained and actionable instruction**; it must not refer to previous steps, instead those should all be directly included in the goal. It needs to include not just *what* to do, but also *why*, so the other agent understands the context.
 
 
 **JSON Structure:**

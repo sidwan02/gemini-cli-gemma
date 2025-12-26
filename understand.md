@@ -250,13 +250,14 @@ Using the codebase investigator: tell me how the ollama inference works.
 
 <!--  -->
 
-1. chat_history maybe shouldn't have the model's tool choice. actually this
-   could be fine.
-1. Tool call service should take in the full chat history since if the model's
-   tool choice is provided then the last mesage is just the tool choice action
-   by the main subagent loop.
+1. If the tool call service makes a bad tool call that should be corrected by
+   the tool call service itself, not be seen by the subagent.
 1. When tool service makes a tool call, that should be reflected in the UI. In
    general, subagent services should be reflected in the UI.
+1. If there is a cancel in the subagent right now the summarizer gets something
+   like this
+   `Tool Call Output: [{"text":"{\"id\":\"283a387e-a136-4443-b3cd-1267b58cb5db########0-build_and_test_agent-mchfa2#2-0\",\"name\":\"run_shell_command\",\"response\":{\"error\":\"[Operation Cancelled] User cancelled the operation.\"}}"}]`
+   and keeps executing, it should be interrupted properly and stop inference.
 
 <!-- For routing -->
 

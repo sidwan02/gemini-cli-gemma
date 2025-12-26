@@ -11,26 +11,35 @@ import { StreamEventType } from '../core/geminiChat.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import * as fs from 'node:fs/promises';
 
-const SUMMARIZER_SYSTEM_PROMPT = `## Role
-You are an expert Tool Call Output Summarizer.
+const SUMMARIZER_SYSTEM_PROMPT = `## Role 
+You are a Technical Log Extraction Specialist.
 
 ## Task Definition
-Your task is to summarize a given tool call output. The summary must specifically highlight how the tool call output contributes to or addresses the user's overall objective.
+Your task is to identify and extract the **top 5 most relevant sections** from the tool call output that relate to the user's \`<objective>\`.
 
-## Instruction
-When generating the summary, focus solely on the information within the \`toolcall\` that directly addresses or fulfills aspects of the \`objective\`. **The summary must be as exhaustive as possible, capturing every relevant detail from the tool call, and must be presented as a bulleted list.** Do not include extraneous details or interpret the tool call beyond its direct relevance to the objective.
+## Instructions
+1. **Prioritize Signal over Noise:** Search the logs for the 5 sections that provide the most conclusive evidence regarding the objective. 
+   - **Priority 1:** Terminal success indicators for the target (e.g., lines with \`✓\`, \`PASS\`, or \`Tests: X passed\`).
+   - **Priority 2:** Detailed error messages or stack traces if the target failed (e.g., \`✕\`, \`AssertionError\`).
+   - **Priority 3:** Final process summaries or exit codes.
+   - **Lowest Priority:** Repetitive "No test files found" or "queued" messages.
+2. **Direct Extraction:** Provide these 5 sections as **separate code blocks**. 
+3. **Preserve Verbatim Text:** Do not summarize, edit, or interpret the text within the blocks. Copy them exactly as they appear in the raw log.
+4. **Context Labels:** Before each code block, add a brief one-line label identifying the context (e.g., \`[Context: packages/core]\`).
 
-## Response Format Constraints
-The response **must be a bulleted list** containing **up to 20 points** (maximum). Each bullet point should be concise. DO NOT include any explicit explanations, reasoning, or thinking process outside of the bullet points. Your output must ONLY be the bulleted summary.`;
+## Constraints
+- Output exactly 5 blocks (or fewer if the total log is very short).
+- Do not add analysis or conclusions.
+- Output ONLY the labeled code blocks.
+`;
 
 const SUMMARIZER_USER_PROMPT = `## Input
-User's Objective: {{objective}}
-Tool Call Output: {{toolcall}}
+User's Objective: 
+{{objective}}
 
-## Output Reminder
-Take a deep breath, read the instructions again, read the inputs again. Each instruction is crucial and must be executed with utmost care and attention to detail.
-
-Summary:`;
+Tool Call Output: 
+{{toolcall}}
+`;
 
 export class SummarizationService {
   constructor() {}
