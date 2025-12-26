@@ -1058,6 +1058,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       const completeFunctionCalls: FunctionCall[] = [];
       for (const functionCall of functionCalls) {
         if (functionCall.name) {
+          // If the function call is already complete_task, just add it. No need to to dynamic tool call generation.
+          if (functionCall.name === TASK_COMPLETE_TOOL_NAME) {
+            completeFunctionCalls.push(functionCall);
+            continue;
+          }
           const tool = this.toolRegistry.getTool(functionCall.name);
           if (tool) {
             goal = (functionCall.args as { goal?: string })?.goal ?? '';
@@ -1115,6 +1120,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         args,
       });
 
+      debugLogger.log(
+        `[AgentExecutor] Checking function call: ${functionCall.name}`,
+      );
       if (functionCall.name === TASK_COMPLETE_TOOL_NAME) {
         debugLogger.log('[AgentExecutor] Processing complete_task tool call.');
         if (taskCompleted) {
