@@ -12,10 +12,11 @@ import type {
   SubagentToolResponseHistoryItem,
   SubagentThoughtHistoryItem,
   SubagentToolSummaryHistoryItem,
+  DynamicToolCallChunkHistoryItem,
 } from '../../types.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { SubagentToolCallDisplay } from './SubagentToolCallDisplay.js';
-import { debugLogger } from '@google/gemini-cli-core';
+// import { debugLogger } from '@google/gemini-cli-core';
 
 interface SubagentHistoryDisplayProps {
   history: SubagentHistoryItem[];
@@ -27,6 +28,7 @@ type SubagentTurn = {
   toolCall?: SubagentToolCallHistoryItem;
   toolResponse?: SubagentToolResponseHistoryItem;
   toolSummary?: SubagentToolSummaryHistoryItem;
+  dynamicToolCall?: DynamicToolCallChunkHistoryItem;
   subagentHistory?: SubagentHistoryItem[];
 };
 
@@ -93,6 +95,13 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
           lastTurn.thought = item;
         }
         break;
+      case 'dynamic_tool_call_chunk':
+        // debugLogger.log('overriding dynamic tool call chunk');
+        lastTurn.dynamicToolCall = {
+          type: 'dynamic_tool_call_chunk',
+          data: { chunk: item.data.chunk },
+        };
+        break;
       case 'tool_call':
         if (lastTurn.toolCall) {
           acc.push({ toolCall: item });
@@ -108,7 +117,7 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
         break;
       case 'tool_summary_chunk':
         // Overwrite the previous toolSummary with the new chunk, enabling streaming.
-        debugLogger.log('overriding tool summary chunk');
+        // debugLogger.log('overriding tool summary chunk');
         lastTurn.toolSummary = {
           type: 'tool_summary',
           data: { summary: item.data.summary },
@@ -193,6 +202,20 @@ export const SubagentHistoryDisplay: React.FC<SubagentHistoryDisplayProps> = ({
                     isPending={false}
                     terminalWidth={availableWidth} // Also apply the adjusted width to MarkdownDisplay
                   />
+                </Box>
+              )}
+              {turn.dynamicToolCall && (
+                <Box
+                  flexDirection="column"
+                  marginBottom={1}
+                  width={availableWidth}
+                  borderStyle="single"
+                  borderColor="green"
+                  paddingX={1}
+                  paddingY={0}
+                >
+                  <Text color="green">Dynamic Tool Call:</Text>
+                  <Text>{turn.dynamicToolCall.data.chunk}</Text>
                 </Box>
               )}
               {turn.toolCall && (

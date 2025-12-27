@@ -46,6 +46,7 @@ export interface SubagentActivityEvent {
   agentName: string;
   type:
     | 'TOOL_CALL_START'
+    | 'DYNAMIC_TOOL_CALL_CHUNK'
     | 'TOOL_CALL_END'
     | 'THOUGHT_CHUNK'
     | 'ERROR'

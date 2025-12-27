@@ -136,6 +136,13 @@ export class SubagentInvocation<
               )}`,
             );
             break;
+          case 'DYNAMIC_TOOL_CALL_CHUNK':
+            updateOutput(
+              `GEMINI_SUBAGENT_DYNAMIC_TOOL_CALL_CHUNK::${JSON.stringify(
+                activity.data,
+              )}`,
+            );
+            break;
           case 'ERROR':
             updateOutput(
               `GEMINI_SUBAGENT_ERROR::${JSON.stringify(activity.data)}`,

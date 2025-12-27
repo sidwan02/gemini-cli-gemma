@@ -1076,6 +1076,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
                 functionCall.name,
                 goal,
                 this.definition.modelConfig,
+                (chunk) => {
+                  this.emitActivity('DYNAMIC_TOOL_CALL_CHUNK', {
+                    chunk,
+                  });
+                },
               );
             // Preserve the original goal in the new function call's arguments for summarization.
             if (goal) {

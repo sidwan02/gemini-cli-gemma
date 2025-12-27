@@ -84,6 +84,7 @@ export class ToolCallService {
     toolName: string,
     goal: string,
     modelConfig: ModelConfig | OllamaModelConfig,
+    onChunk?: (chunk: string) => void,
   ): Promise<FunctionCall> {
     const tool = this.toolRegistry.getTool(toolName);
     if (!tool) {
@@ -144,6 +145,9 @@ Respond with only the JSON for the tool call. Do not include any other text or m
 
         if (text) {
           textResponse = text;
+          if (onChunk) {
+            onChunk(text);
+          }
         }
       }
     }

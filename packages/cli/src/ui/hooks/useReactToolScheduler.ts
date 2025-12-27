@@ -110,6 +110,8 @@ export function useReactToolScheduler(
           'GEMINI_SUBAGENT_START::': 'start',
           'GEMINI_SUBAGENT_THOUGHT::': 'thought',
           'GEMINI_SUBAGENT_TOOL_CALL::': 'tool_call',
+          'GEMINI_SUBAGENT_DYNAMIC_TOOL_CALL_CHUNK::':
+            'dynamic_tool_call_chunk',
           'GEMINI_SUBAGENT_TOOL_RESPONSE::': 'tool_response',
           'GEMINI_SUBAGENT_TOOL_SUMMARY::': 'tool_summary',
           'GEMINI_SUBAGENT_TOOL_SUMMARY_CHUNK::': 'tool_summary_chunk',
@@ -156,6 +158,15 @@ export function useReactToolScheduler(
                       lastHistoryItem?.type === 'tool_output_chunk'
                     ) {
                       // Replace the last tool output chunk with the new one
+                      newHistory = [
+                        ...currentHistory.slice(0, -1),
+                        newHistoryItem,
+                      ];
+                    } else if (
+                      newHistoryItem.type === 'dynamic_tool_call_chunk' &&
+                      lastHistoryItem?.type === 'dynamic_tool_call_chunk'
+                    ) {
+                      // Replace the last tool call chunk with the new one
                       newHistory = [
                         ...currentHistory.slice(0, -1),
                         newHistoryItem,

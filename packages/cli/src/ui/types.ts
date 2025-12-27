@@ -406,7 +406,8 @@ export type SubagentHistoryItem =
   | { type: 'interrupted'; data: { message: string } }
   | { type: 'user_message'; data: { message: string } }
   | SubagentToolSummaryHistoryItem
-  | SubagentToolSummaryChunkHistoryItem;
+  | SubagentToolSummaryChunkHistoryItem
+  | DynamicToolCallChunkHistoryItem;
 
 export type SubagentToolSummaryChunkHistoryItem = {
   type: 'tool_summary_chunk';
@@ -416,6 +417,11 @@ export type SubagentToolSummaryChunkHistoryItem = {
 export type SubagentToolSummaryHistoryItem = {
   type: 'tool_summary';
   data: { summary: string };
+};
+
+export type DynamicToolCallChunkHistoryItem = {
+  type: 'dynamic_tool_call_chunk';
+  data: { chunk: string };
 };
 
 export type SubagentThoughtHistoryItem = Extract<
