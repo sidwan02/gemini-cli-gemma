@@ -208,7 +208,7 @@ export interface LocalAgentDefinition<
 
   // Local agent required configs
   promptConfig: PromptConfig;
-  modelConfig: ModelConfig;
+  modelConfig: ModelConfig & Partial<OllamaModelConfig>;
   runConfig: RunConfig;
 
   // Optional configs
@@ -263,6 +263,14 @@ export interface PromptConfig {
    */
   systemPrompt?: string;
   /**
+   * An optional directive string that is appended to the user prompt.
+   */
+  directive?: string;
+  /**
+   * An optional reminder string that is appended to the user prompt.
+   */
+  reminder?: string;
+  /**
    * An array of user/model content pairs for few-shot prompting.
    */
   initialMessages?: Content[];
@@ -315,6 +323,13 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
 /**
  * Configures the execution environment and constraints for the agent.
  */
+export interface OllamaModelConfig {
+  model: string;
+  host: string;
+  temp?: number;
+  top_p?: number;
+}
+
 export interface RunConfig {
   /**
    * The maximum execution time for the agent in minutes.

@@ -1009,7 +1009,9 @@ export async function loadCliConfig(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
+    gemmaSubagentSettings: settings.experimental?.gemmaSubagentSettings,
     gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+    buildAndTestSettings: settings.experimental?.buildAndTestSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,

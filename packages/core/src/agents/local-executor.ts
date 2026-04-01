@@ -7,6 +7,9 @@
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
+import { OllamaChat } from '../core/ollamaChat.js';
+import type { Part as OllamaPart } from '../core/ollamaChat.js';
+
 import {
   Type,
   type Content,
@@ -57,13 +60,14 @@ import {
   type AgentInputs,
   type OutputObject,
   type SubagentActivityEvent,
+  type OllamaModelConfig,
 } from './types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
-import { type z } from 'zod';
+import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
@@ -76,6 +80,7 @@ import {
   formatBackgroundCompletionForModel,
 } from '../utils/fastAckHelper.js';
 import type { InjectionSource } from '../config/injectionService.js';
+import { parseToolCalls } from '../utils/toolCallParser.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -306,7 +311,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * or stop the agent loop.
    */
   private async executeTurn(
-    chat: GeminiChat,
+    chat: GeminiChat | OllamaChat,
     currentMessage: Content,
     turnCounter: number,
     combinedSignal: AbortSignal,
@@ -379,6 +384,63 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   }
 
   /**
+   * Formats tool declarations for Gemma's function calling format.
+   * This involves removing descriptions from parameters and converting
+   * `parametersJsonSchema` to `parameters`.
+   */
+  private _prepareGemmaToolCode(tools: FunctionDeclaration[]): string {
+    return `${JSON.stringify(
+      tools.map((tool) => {
+        // Create a mutable copy of the tool to avoid modifying the original
+        const newTool: Record<string, unknown> = { ...tool };
+
+        // If 'parametersJsonSchema' exists, convert it to 'parameters'
+        if (newTool['parametersJsonSchema']) {
+          newTool['parameters'] = newTool['parametersJsonSchema'];
+          delete newTool['parametersJsonSchema'];
+        }
+
+        // Process parameters to remove any parameter named 'description'
+        const ParamsSchema = z
+          .object({
+            properties: z.record(z.unknown()).optional(),
+            required: z.array(z.string()).optional(),
+          })
+          .passthrough();
+
+        const paramsResult = ParamsSchema.safeParse(newTool['parameters']);
+        if (paramsResult.success && paramsResult.data.properties) {
+          const newProperties: Record<string, unknown> = {};
+          for (const [propName, propValue] of Object.entries(
+            paramsResult.data.properties,
+          )) {
+            // Only include properties that are not named 'description'
+            if (propName !== 'description') {
+              newProperties[propName] = propValue;
+            }
+          }
+
+          const updatedParams = {
+            ...paramsResult.data,
+            properties: newProperties,
+          };
+
+          // Also update the 'required' array if 'description' was listed as required
+          if (paramsResult.data.required) {
+            updatedParams.required = paramsResult.data.required.filter(
+              (reqProp) => reqProp !== 'description',
+            );
+          }
+          newTool['parameters'] = updatedParams;
+        }
+        return newTool;
+      }),
+      null,
+      2,
+    )}`;
+  }
+
+  /**
    * Generates a specific warning message for the agent's final turn.
    */
   private getFinalWarningMessage(
@@ -411,7 +473,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns The final result string if recovery was successful, or `null` if it failed.
    */
   private async executeFinalWarningTurn(
-    chat: GeminiChat,
+    chat: GeminiChat | OllamaChat,
     turnCounter: number,
     reason:
       | AgentTerminateMode.TIMEOUT
@@ -537,7 +599,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       new AgentStartEvent(this.agentId, this.definition.name),
     );
 
-    let chat: GeminiChat | undefined;
+    let chat: GeminiChat | OllamaChat | undefined;
     let tools: FunctionDeclaration[] | undefined;
     try {
       // Inject standard runtime context into inputs
@@ -800,10 +862,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   }
 
   private async tryCompressChat(
-    chat: GeminiChat,
+    chat: GeminiChat | OllamaChat,
     prompt_id: string,
-    abortSignal?: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<void> {
+    if (chat instanceof OllamaChat) {
+      return;
+    }
+
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
     const { newHistory, info } = await this.compressionService.compress(
@@ -841,12 +907,66 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    *
    * @returns The model's response, including any tool calls or text.
    */
-  private async callModel(
-    chat: GeminiChat,
+  private async callOllamaModel(
+    chat: OllamaChat,
     message: Content,
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const messageParts: OllamaPart[] = (message.parts || [])
+      .map((p) => {
+        if ('text' in p && typeof p.text === 'string') {
+          return { text: p.text };
+        }
+        return null;
+      })
+      .filter((p): p is OllamaPart => p !== null);
+
+    const messageParams = {
+      message: messageParts,
+    };
+
+    debugLogger.log(`[Debug] Sending message to Ollama model`);
+
+    const stream = await chat.sendMessageStream('', messageParams);
+
+    let fullResponse = '';
+
+    for await (const chunk of stream) {
+      if (signal?.aborted) {
+        debugLogger.log(
+          '[Debug] Signal aborted, breaking Ollama response stream.',
+        );
+        break;
+      }
+
+      if (chunk.type === 'chunk') {
+        const textChunk =
+          chunk.value.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textChunk) {
+          fullResponse = textChunk;
+
+          this.emitActivity('THOUGHT_CHUNK', { text: textChunk });
+        }
+      }
+    }
+
+    const functionCalls = parseToolCalls(fullResponse, promptId);
+
+    return { functionCalls, textResponse: fullResponse };
+  }
+
+  private async callModel(
+    chat: GeminiChat | OllamaChat,
+    message: Content,
+    signal: AbortSignal,
+    promptId: string,
+  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    if (chat instanceof OllamaChat) {
+      return this.callOllamaModel(chat, message, signal, promptId);
+    }
+
+    // Original GeminiChat logic
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
@@ -903,12 +1023,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       if (resp.type === StreamEventType.CHUNK) {
         const chunk = resp.value;
-        const parts = chunk.candidates?.[0]?.content?.parts;
+        const rawParts = chunk.candidates?.[0]?.content?.parts ?? [];
+
+        // Define a schema for parts with a thought field
+        const ThoughtSchema = z.object({ thought: z.string() }).passthrough();
 
         // Extract and emit any subject "thought" content from the model.
-        const { subject } = parseThought(
-          parts?.find((p) => p.thought)?.text || '',
-        );
+        let thoughtContent = '';
+        for (const p of rawParts) {
+          const result = ThoughtSchema.safeParse(p);
+          if (result.success) {
+            thoughtContent = result.data.thought;
+            break;
+          }
+        }
+        const { subject } = parseThought(thoughtContent);
         if (subject) {
           this.emitActivity('THOUGHT_CHUNK', { text: subject });
         }
@@ -919,11 +1048,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Handle text response (non-thought text)
-        const text =
-          parts
-            ?.filter((p) => !p.thought && p.text)
-            .map((p) => p.text)
-            .join('') || '';
+        const text = rawParts
+          .filter((p): p is Part & { text: string } => {
+            if (!('text' in p) || typeof p.text !== 'string') return false;
+            const result = ThoughtSchema.safeParse(p);
+            return !result.success || !result.data.thought;
+          })
+          .map((p) => p.text)
+          .join('');
 
         if (text) {
           textResponse += text;
@@ -938,7 +1070,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private async createChatObject(
     inputs: AgentInputs,
     tools: FunctionDeclaration[],
-  ): Promise<GeminiChat> {
+  ): Promise<GeminiChat | OllamaChat> {
     const { promptConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
@@ -956,6 +1088,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const systemInstruction = promptConfig.systemPrompt
       ? await this.buildSystemPrompt(inputs)
       : undefined;
+
+    // Use an explicit type check for Ollama model config
+    const { modelConfig } = this.definition;
+    if (modelConfig.host && modelConfig.model) {
+      const concreteOllamaConfig: OllamaModelConfig = {
+        host: modelConfig.host,
+        model: modelConfig.model,
+        temp: modelConfig.temp,
+        top_p: modelConfig.top_p,
+      };
+      return new OllamaChat(
+        concreteOllamaConfig,
+        systemInstruction,
+        startHistory,
+        promptConfig,
+      );
+    }
 
     try {
       return new GeminiChat(
@@ -1384,8 +1533,20 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       return '';
     }
 
+    const templateInputs: Record<string, unknown> = { ...inputs };
+
+    if (promptConfig.directive) {
+      templateInputs['directive'] = promptConfig.directive;
+    }
+
+    const tools = this.prepareToolsList();
+    if (promptConfig.systemPrompt.includes('${tool_code}')) {
+      const toolCode = this._prepareGemmaToolCode(tools);
+      templateInputs['tool_code'] = toolCode;
+    }
+
     // Inject user inputs into the prompt template.
-    let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+    let finalPrompt = templateString(promptConfig.systemPrompt, templateInputs);
 
     // Append memory context if available.
     const systemMemory = this.context.config.getSystemInstructionMemory();
@@ -1394,7 +1555,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     // Append environment context (CWD and folder structure).
-    const dirContext = await getDirectoryContextString(this.context.config);
+    const dirContext = await getDirectoryContextString(
+      this.context.config,
+      this.definition.modelConfig.model,
+    );
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
 
     // Append standard rules for non-interactive execution.

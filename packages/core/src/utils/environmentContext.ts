@@ -17,19 +17,24 @@ export const INITIAL_HISTORY_LENGTH = 1;
  */
 export async function getDirectoryContextString(
   config: Config,
+  model?: string,
 ): Promise<string> {
   const workspaceContext = config.getWorkspaceContext();
   const workspaceDirectories = workspaceContext.getDirectories();
 
-  const folderStructures = await Promise.all(
-    workspaceDirectories.map((dir) =>
-      getFolderStructure(dir, {
-        fileService: config.getFileService(),
-      }),
-    ),
-  );
+  let folderStructure = '';
+  // if (model === 'gemma3:12b') {
+  if (model === 'gemma3:27b') {
+    const folderStructures = await Promise.all(
+      workspaceDirectories.map((dir) =>
+        getFolderStructure(dir, {
+          fileService: config.getFileService(),
+        }),
+      ),
+    );
+    folderStructure = folderStructures.join('\n');
+  }
 
-  const folderStructure = folderStructures.join('\n');
   const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
 
   return `- **Workspace Directories:**\n${dirList}

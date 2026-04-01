@@ -12,6 +12,8 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { getAgentCardLoadOptions, getRemoteAgentTargetUrl } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { GemmaAgent } from './gemma.js';
+import { BuildAndTestAgent } from './build-test-agent.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
@@ -250,6 +252,8 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
+    this.registerLocalAgent(GemmaAgent(this.config));
+    this.registerLocalAgent(BuildAndTestAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
 

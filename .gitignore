@@ -64,3 +64,4 @@ gemini-debug.log
 evals/logs/
 
 temp_agents/
+\n# Migration temp files\nrouter.txt\nsubagent_last_message_content.txt\nall_modified.txt\ndiff.txt\ngit_changes.txt\ngit_commits.txt\ngit_files_modified.txt

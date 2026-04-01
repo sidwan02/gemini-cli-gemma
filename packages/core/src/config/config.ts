@@ -230,12 +230,28 @@ export interface ToolOutputMaskingConfig {
   protectLatestTurn: boolean;
 }
 
+export interface GemmaSubagentSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  model?: string;
+  host?: string;
+}
+
 export interface GemmaModelRouterSettings {
   enabled?: boolean;
   classifier?: {
     host?: string;
     model?: string;
   };
+}
+
+export interface BuildAndTestSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  model?: string;
+  host?: string;
 }
 
 export interface ExtensionSetting {
@@ -674,7 +690,9 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  gemmaSubagentSettings?: GemmaSubagentSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
+  buildAndTestSettings?: BuildAndTestSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -895,7 +913,9 @@ export class Config implements McpContext, AgentLoopContext {
     | undefined;
   private readonly outputSettings: OutputSettings;
 
+  private readonly gemmaSubagentSettings: GemmaSubagentSettings;
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
+  private readonly buildAndTestSettings: BuildAndTestSettings;
 
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -1300,6 +1320,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.gemmaSubagentSettings = {
+      enabled: params.gemmaSubagentSettings?.enabled ?? false,
+      maxNumTurns: params.gemmaSubagentSettings?.maxNumTurns ?? 15,
+      maxTimeMinutes: params.gemmaSubagentSettings?.maxTimeMinutes ?? 5,
+      model: params.gemmaSubagentSettings?.model ?? 'gemma3n:e2b',
+      host: params.gemmaSubagentSettings?.host ?? 'http://localhost:11434',
+    };
     this.gemmaModelRouter = {
       enabled: params.gemmaModelRouter?.enabled ?? false,
       classifier: {
@@ -1308,6 +1335,13 @@ export class Config implements McpContext, AgentLoopContext {
         model:
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
+    };
+    this.buildAndTestSettings = {
+      enabled: params.buildAndTestSettings?.enabled ?? false,
+      maxNumTurns: params.buildAndTestSettings?.maxNumTurns ?? 15,
+      maxTimeMinutes: params.buildAndTestSettings?.maxTimeMinutes ?? 20,
+      model: params.buildAndTestSettings?.model ?? 'gemma3n:e4b',
+      host: params.buildAndTestSettings?.host ?? 'http://localhost:11434',
     };
     this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
@@ -3339,8 +3373,16 @@ export class Config implements McpContext, AgentLoopContext {
     return this.gemmaModelRouter.enabled ?? false;
   }
 
+  getGemmaSubagentSettings(): GemmaSubagentSettings {
+    return this.gemmaSubagentSettings;
+  }
+
   getGemmaModelRouterSettings(): GemmaModelRouterSettings {
     return this.gemmaModelRouter;
+  }
+
+  getBuildAndTestSettings(): BuildAndTestSettings {
+    return this.buildAndTestSettings;
   }
 
   /**
